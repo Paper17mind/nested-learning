@@ -1,9 +1,10 @@
 __pycache__/
 *.py[cod]
 data/*
+docs/*
 logs/*
 !data/.gitkeep
-models/*.npz
+models/*
 !models/.gitkeep
 .env
 .env.local

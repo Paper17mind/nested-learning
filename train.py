@@ -13,6 +13,7 @@ Usage:
     python train.py --data data/contoh_teks.txt --d-model 64 --n-layers 4 --cms-tiers "2,1:2,4"
 """
 
+import json
 import argparse
 import os
 import sys
@@ -41,6 +42,7 @@ def parse_tiers(tier_str: str, n_layers: int):
 def parse_args():
     parser = argparse.ArgumentParser(description="Train HOPE model on custom datasets")
     # Dataset arguments
+    parser.add_argument("--val-data", type=str, default=None, help="File JSONL QA terpisah untuk validasi")
     parser.add_argument("--data", type=str, required=True,
                         help="Path to text or JSONL dataset file(s). Supports comma-separated files or directory.")
     parser.add_argument("--checkpoint", type=str, default=None,
@@ -146,6 +148,30 @@ def load_dataset(args, tokenizer):
         print(f"Merging {len(datasets)} datasets into one combined corpus...")
         return nl.TextDataset.concat(datasets)
 
+def build_char_tokenizer_from_qa(path, question_key, answer_key):
+    import json
+
+    texts = []
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+
+            item = json.loads(line)
+            q = str(item.get(question_key, ""))
+            a = str(item.get(answer_key, ""))
+
+            texts.append(
+                f"Pertanyaan: {q}\nJawaban: {a}\n\n"
+            )
+
+    if not texts:
+        raise ValueError("Dataset training kosong.")
+
+    corpus = "".join(texts)
+    return nl.CharTokenizer.train_from_text(corpus)
+
 def main():
     args = parse_args()
     if args.threads > 0:
@@ -159,11 +185,39 @@ def main():
     print("=" * 70)
 
     # 1. Tokenizer
-    tok = nl.get_tokenizer(args.tokenizer)
-    print(f"Tokenizer: {tok.__class__.__name__} (Vocab size: {tok.vocab_size})")
+    if args.tokenizer == "char":
+        tok = build_char_tokenizer_from_qa(
+            args.data,
+            args.question_key,
+            args.answer_key,
+        )
+    else:
+        tok = nl.get_tokenizer(args.tokenizer)
+
+    print(
+        f"Tokenizer: {tok.__class__.__name__} "
+        f"| Vocab: {tok.vocab_size}"
+    )
 
     # 2. Dataset
     full_ds = load_dataset(args, tok)
+    if args.val_data:
+        val_args = argparse.Namespace(**vars(args))
+        val_args.data = args.val_data
+        val_args.data_type = "qa"
+
+        train_ds = full_ds
+        val_ds = load_dataset(val_args, tok)
+
+        print(
+            f"Train sequences: {len(train_ds)} "
+            f"| Validation sequences: {len(val_ds)}"
+        )
+    else:
+        train_ds, val_ds = full_ds.train_val_split(
+            val_ratio=args.val_ratio
+    )
+
     print(f"Total tokens: {len(full_ds.tokens):,} | Sequences: {len(full_ds)}")
 
     if args.val_ratio > 0.0 and len(full_ds.tokens) > 100:
@@ -214,8 +268,11 @@ def main():
 
     # 5. Training Loop
     save_path = args.save_path
+    tokenizer_path = save_path + ".tokenizer.json"
     if not os.path.dirname(save_path):
         save_path = os.path.join("models", save_path)
+    
+    tok.save(tokenizer_path)
     os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
 
     trainer = nl.Trainer(model, optimizer, loss_fn, tok)
