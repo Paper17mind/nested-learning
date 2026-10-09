@@ -831,3 +831,115 @@ Keduanya terinspirasi langsung oleh mekanisme yang sama di otak manusia: **Compl
    - Jika pengguna belum mengisi `OPENAI_API_KEY` di `.env` (masih placeholder `your_api_key_here`), skrip otomatis beralih ke kurikulum bawaan offline tanpa crash.
    - Begitu pengguna menempelkan API key 9router/OpenRouter di `.env`, skrip otomatis tersambung ke 9router/OpenRouter.
    - Dokumentasi lengkap diperbarui di `docs/LLM_TEACHER_TUTORING.md`.
+
+---
+
+## 27. Pembaruan: Sistem Pencatatan Log Otomatis untuk Setiap Sesi Pembelajaran
+
+### Pertanyaan Lanjutan Pengguna:
+> *"buatkan log untuk setiap pembelajaran"*
+
+### Solusi yang Diimplementasikan:
+1. **Folder Penyimpanan Log (`logs/`):**
+   - Setiap sesi pembelajaran otomatis membuat log lengkap dalam dua format:
+     - **Format `.jsonl` (`logs/tutoring_YYYYMMDD_HHMMSS.jsonl`):** Log terstruktur per turn untuk analisis komputasi/mesin.
+     - **Format `.md` (`logs/tutoring_YYYYMMDD_HHMMSS.md` & `logs/latest_tutoring.md`):** Laporan visual lengkap yang mudah dibaca langsung di editor markdown, memuat tabel ringkasan dan dialog per turn.
+
+2. **Informasi Lengkap yang Dicatat di Setiap Turn:**
+   - Materi pelajaran guru (*lesson text*).
+   - Pertanyaan kuis evaluasi (*quiz prompt*).
+   - Jawaban murid sebelum diajar (*pre-test answer*) vs skor recall (%).
+   - Jawaban murid setelah diajar (*post-test answer*) vs skor recall (%).
+   - Loss pelajaran & Perplexity (tingkat kebingungan murid).
+   - Norma matriks memori dinamis $\|M\|$.
+   - Peningkatan pemahaman per turn (*improvement delta*).
+
+3. **Pencatatan di `train.py` dan `chat.py`:**
+   - `train.py`: Mencatat riwayat pelatihan dataset ke `logs/training_runs.jsonl`.
+   - `chat.py`: Mencatat perintah `/learn` ke `logs/in_chat_learning.log`.
+
+---
+
+## 28. Pembaruan: Kustomisasi Topik Pembelajaran Guru LLM
+
+### Pertanyaan Lanjutan Pengguna:
+> *"untuk materinya bisa ditambahin argument gak ?, biar topik nya gak itu itu aja"*
+
+### Solusi yang Diimplementasikan:
+Skrip `scripts/llm_teacher_train.py` kini dilengkapi 4 cara fleksibel untuk menentukan topik pelajaran:
+
+1. **Satu Topik Spesifik (`--topic`):**
+   ```bash
+   python scripts/llm_teacher_train.py --topic "Dinosaurus" --turns 3
+   python scripts/llm_teacher_train.py --topic "Kecerdasan Buatan dan Robotika" --turns 3
+   ```
+
+2. **Daftar Berganti-Ganti Topik per Turn (`--topics`):**
+   ```bash
+   python scripts/llm_teacher_train.py --topics "Mobil Listrik,Robotika,Planet Mars,Kucing,Kopi" --turns 5
+   ```
+
+3. **Paket Kategori Kurikulum Bawaan (`--category`):**
+   Pilihan: `transportasi`, `teknologi`, `sains`, `biologi`, `kuliner`, `all`.
+   ```bash
+   python scripts/llm_teacher_train.py --category sains --turns 4
+   python scripts/llm_teacher_train.py --category teknologi --turns 4
+   ```
+
+4. **Dari Berkas Materi Buatan Sendiri (`--materi-file`):**
+   Membaca langsung dari berkas teks paragraf (`.txt`) atau `.jsonl`:
+   ```bash
+   python scripts/llm_teacher_train.py --materi-file data/fakta_transportasi.txt --turns 5
+   ```
+
+5. **Pengaruh ke Guru LLM (9router / OpenRouter / Ollama):**
+   Ketika topik diberikan, prompt ke LLM secara dinamis menyertakan instruksi topik tersebut, sehingga Guru LLM secara kreatif dan variatif menciptakan materi baru beserta kuis yang relevan di setiap turn!
+
+---
+
+## 29. Pembaruan: Mengapa Tabel `fast_memory` di SQLite Sempat Kosong & Solusi Auto-Save
+
+### Pertanyaan Lanjutan Pengguna (Melalui Gambar Tangkapan Layar):
+> *(Gambar VS Code SQLite Viewer pada `data > memory.db` tabel `fast_memory` menunjukkan `Rows: 0`)*  
+> *"aku cek di table memory kenapa kosong ya ?"*
+
+### Akar Penyebab:
+1. Struktur tabel `fast_memory` dan kolom-kolomnya (`session_id`, `shape`, `dtype`, `norm`, `state_blob`, `meta`) berhasil dibuat secara otomatis oleh `SQLiteMemoryStore("data/memory.db")`.
+2. **Namun baris data masih 0 (kosong) karena:**
+   - Sebelumnya, fungsi penyimpanan ke database hanya dipicu ketika pengguna secara manual mengetik perintah `/session <nama>`.
+   - Ketika pengguna mengobrol biasa, atau keluar dengan `quit` / `Ctrl+C`:
+     Matriks memori hanya diperbarui di RAM dan file `.npz`, belum otomatis di-commit ke baris database SQLite.
+
+### Solusi yang Diimplementasikan:
+1. **Auto-Persist Setelah Setiap Turn Percakapan (`chat.py`):**
+   - Setiap kali bot selesai menghasilkan balasan, matriks memori $M$ langsung otomatis disimpan ke `data/memory.db` untuk sesi aktif (`default` atau nama sesi Anda).
+   - Menyertakan metadata `last_prompt`, `last_reply`, norma memori, dan timestamp.
+2. **Auto-Persist Saat Keluar (`quit`, `exit`, atau Ctrl+C):**
+   - Sebelum program menutup, state memori terakhir otomatis di-commit ke SQLite.
+3. **Auto-Persist pada Pelatihan Guru LLM (`llm_teacher_train.py`):**
+   - Di akhir sesi pembelajaran, memori murid otomatis disimpan ke SQLite dengan session ID `tutoring_<waktu>` dan `latest_tutoring`.
+4. **Verifikasi:**
+   - Database `data/memory.db` telah diverifikasi dan kini terisi baris data aktif:
+     - `session_id: default`
+     - `session_id: tutoring_...`
+     - `session_id: latest_tutoring`
+   - Tombol refresh (🔄) di SQLite Viewer VS Code kini menampilkan baris data nyata.
+
+---
+
+## 30. Pembaruan: Standarisasi Default `session_id` ke "default"
+
+### Pertanyaan Lanjutan Pengguna:
+> *"untuk session_id, kalau gak diisi, buat aja 'default'"*
+
+### Solusi yang Diimplementasikan:
+1. **Di Pustaka `nested_learning.memory_store` (`SQLiteMemoryStore`):**
+   - Metode `save_memory`, `load_memory`, dan `delete_memory` kini memiliki nilai bawaan `session_id="default"`.
+   - Jika nilai yang dimasukkan adalah `None`, string kosong `""`, atau spasi, sistem secara otomatis menormalisasikannya menjadi `"default"`.
+
+2. **Di Konsol Chat (`chat.py`):**
+   - Ditambahkan argumen CLI `--session` dengan default `"default"`.
+   - Jika pengguna mengetik perintah `/session` tanpa nama argumen, sistem secara otomatis beralih kembali ke sesi `"default"`.
+
+3. **Verifikasi:**
+   - Uji coba unit test menunjukkan penyimpanan dan pemulihan memori tanpa `session_id` berhasil masuk dan keluar dari baris `"default"` di `data/memory.db`.

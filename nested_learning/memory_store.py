@@ -54,17 +54,20 @@ class SQLiteMemoryStore:
 
     def save_memory(
         self,
-        session_id: str,
-        state: np.ndarray,
+        session_id: Optional[str] = "default",
+        state: Optional[np.ndarray] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Save or update a fast-weight memory state in SQLite.
 
         Args:
-            session_id: Unique identifier for the user/session (e.g., 'user_budi', 'thread_1').
+            session_id: Unique identifier for the user/session (defaults to 'default').
             state: NumPy array representing the memory matrix [B, D, D] or [D, D].
             meta: Optional dictionary of metadata (e.g., username, last_topic).
         """
+        session_id = session_id.strip() if session_id else "default"
+        if not session_id:
+            session_id = "default"
         arr = np.asarray(state, dtype=np.float32)
         shape_str = json.dumps(list(arr.shape))
         dtype_str = str(arr.dtype)
@@ -88,12 +91,11 @@ class SQLiteMemoryStore:
             """, (session_id, shape_str, dtype_str, f_norm, blob, meta_json, now, now))
             conn.commit()
 
-    def load_memory(self, session_id: str) -> Optional[Tuple[np.ndarray, Dict[str, Any]]]:
-        """Load memory state and metadata for a specific session.
-
-        Returns:
-            Tuple of (state_array, meta_dict) or None if session does not exist.
-        """
+    def load_memory(self, session_id: Optional[str] = "default") -> Optional[Tuple[np.ndarray, Dict[str, Any]]]:
+        """Load memory state and metadata for a specific session (defaults to 'default')."""
+        session_id = session_id.strip() if session_id else "default"
+        if not session_id:
+            session_id = "default"
         with self._get_connection() as conn:
             c = conn.cursor()
             c.execute("SELECT shape, dtype, state_blob, meta FROM fast_memory WHERE session_id = ?", (session_id,))
@@ -126,12 +128,14 @@ class SQLiteMemoryStore:
                 })
             return results
 
-    def delete_memory(self, session_id: str) -> bool:
-        """Delete memory for a session."""
+    def delete_memory(self, session_id: Optional[str] = "default") -> bool:
+        """Delete memory for a session (defaults to 'default')."""
+        session_id = session_id.strip() if session_id else "default"
+        if not session_id:
+            session_id = "default"
         with self._get_connection() as conn:
             c = conn.cursor()
             c.execute("DELETE FROM fast_memory WHERE session_id = ?", (session_id,))
-            conn.commit()
             return c.rowcount > 0
 
 

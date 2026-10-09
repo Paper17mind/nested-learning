@@ -20,9 +20,10 @@ import nested_learning as nl
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Interactive Chat with Nested Learning Lite")
-    parser.add_argument("--checkpoint", type=str, default="models/hope_model.npz", help="Path to .npz model checkpoint")
+    parser.add_argument("--checkpoint", type=str, default="models/hope_tutored.npz", help="Path to .npz model checkpoint")
     parser.add_argument("--temperature", type=float, default=0.2, help="Default sampling temperature")
-    parser.add_argument("--max-tokens", type=int, default=50, help="Default max new tokens per reply")
+    parser.add_argument("--max-tokens", type=int, default=250, help="Default max new tokens per reply")
+    parser.add_argument("--session", type=str, default="default", help="Session ID in SQLite database (default: 'default')")
     return parser.parse_args()
 
 
@@ -92,14 +93,21 @@ def main():
     state: np.ndarray = meta.get("memory_state")
     if state is not None:
         print(f"[Memory]: Restored fast-weight memory state from checkpoint (norm: {float(np.linalg.norm(state[0])):.3f})")
-    current_session = "default"
+    current_session = args.session.strip() if args.session and args.session.strip() else "default"
     db_store = nl.SQLiteMemoryStore("data/memory.db")
+    if state is None:
+        saved_db = db_store.load_memory(current_session)
+        if saved_db is not None:
+            state, db_meta = saved_db
+            print(f"[SQLite]: Restored active memory for session '{current_session}' from data/memory.db (norm: {float(np.linalg.norm(state[0])):.3f})")
     optimizer = nl.NestedOptimizer(model.tier_param_groups(), lr=3e-3, optimizer_cls=nl.AdamW)
     loss_fn = nl.CrossEntropyLoss(ignore_index=tok.pad_token_id)
     while True:
         try:
             user_input = input("\nYou > ").strip()
         except (KeyboardInterrupt, EOFError):
+            if state is not None:
+                db_store.save_memory(current_session, state, meta={"last_action": "interrupt", "checkpoint": current_checkpoint})
             print("\nExiting.")
             break
 
@@ -107,6 +115,8 @@ def main():
             continue
 
         if user_input.lower() in ("quit", "exit"):
+            if state is not None:
+                db_store.save_memory(current_session, state, meta={"last_action": "exit", "checkpoint": current_checkpoint})
             print("Goodbye!")
             break
 
@@ -116,8 +126,8 @@ def main():
 
             if cmd == "/memory":
                 inspect_memory(state)
-            elif cmd == "/session" and len(parts) > 1:
-                new_sess = parts[1].strip()
+            elif cmd == "/session":
+                new_sess = parts[1].strip() if len(parts) > 1 and parts[1].strip() else "default"
                 if state is not None:
                     db_store.save_memory(current_session, state, meta={"checkpoint": current_checkpoint})
                     print(f"[SQLite]: Saved active memory to session '{current_session}'.")
@@ -128,7 +138,7 @@ def main():
                     print(f"[SQLite]: Switched to session '{current_session}'. Restored memory (norm: {float(np.linalg.norm(state[0])):.3f}).")
                 else:
                     state = None
-                    print(f"[SQLite]: Switched to new session '{current_session}'. Starting fresh.")
+                    print(f"[SQLite]: Switched to session '{current_session}' (starting fresh).")
                 continue
             elif cmd == "/sessions":
                 all_sess = db_store.list_sessions()
@@ -177,10 +187,15 @@ def main():
                 model.backward(loss_fn.backward())
                 optimizer.step()
                 print(f"[Learned]: Updated model weights on '{learn_text}' (Loss: {loss:.4f})")
+                log_dir = "logs"
+                os.makedirs(log_dir, exist_ok=True)
+                with open(os.path.join(log_dir, "in_chat_learning.log"), "a", encoding="utf-8") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] session={current_session} loss={loss:.4f} text='{learn_text}'\n")
                 continue
             elif cmd == "/reset":
                 state = None
-                print("[Memory]: Fast memory state reset to zero.")
+                db_store.delete_memory(current_session)
+                print("[Memory]: Fast memory state reset to zero and cleared from SQLite.")
                 continue
             elif cmd == "/temp" and len(parts) > 1:
                 try:
@@ -242,7 +257,17 @@ def main():
 
         print(f"HOPE > {reply_text.strip()}")
         print(f"[Stats]: {len(gen_tokens)} tokens generated in {t1 - t0:.3f}s ({speed:.1f} tok/s) | Memory norm: {float(np.linalg.norm(state[0])): .3f}")
-
+        # Auto-persist memory state to SQLite on every turn
+        if state is not None:
+            db_store.save_memory(
+                session_id=current_session,
+                state=state,
+                meta={
+                    "last_prompt": user_input[:120],
+                    "last_reply": reply_text.strip()[:120],
+                    "checkpoint": current_checkpoint,
+                },
+            )
 
 if __name__ == "__main__":
     main()

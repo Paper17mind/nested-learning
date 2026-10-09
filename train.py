@@ -236,7 +236,23 @@ def main():
     print(f"Training finished! Steps: {result['total_steps']}")
     if result.get("best_val_loss") and result["best_val_loss"] != float("inf"):
         print(f"Best Val Loss: {result['best_val_loss']:.4f}")
-    print(f"Saved Checkpoint: {args.save_path}")
+    print(f"Saved Checkpoint: {save_path}")
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    log_entry = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "data": args.data,
+        "total_tokens": len(full_ds.tokens),
+        "total_steps": result["total_steps"],
+        "epochs": args.epochs,
+        "best_val_loss": result.get("best_val_loss") if result.get("best_val_loss") != float("inf") else None,
+        "checkpoint": save_path,
+        "d_model": args.d_model,
+        "n_layers": args.n_layers,
+    }
+    with open(os.path.join(log_dir, "training_runs.jsonl"), "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+    print("Log dicatat ke: logs/training_runs.jsonl")
     print("=" * 70)
 
     # 6. Sample Generation Test

@@ -70,6 +70,45 @@ Lalu jalankan langsung dengan sangat ringkas:
 python scripts/llm_teacher_train.py --turns 5
 ```
 Skrip akan otomatis membaca `.env`, menyambungkan ke 9router/OpenRouter dengan header yang tepat (`HTTP-Referer`, `X-Title`), dan menjalankan sesi tutoring!
+---
+
+## 3. Kustomisasi Topik & Materi Pelajaran (Agar Tidak Itu-Itu Saja)
+
+Anda dapat secara leluasa menentukan materi apa yang harus diajarkan oleh Guru LLM:
+
+### A. Satu Topik Spesifik (`--topic`)
+Guru LLM akan memfokuskan seluruh sesi pelajaran pada topik pilihan Anda:
+```bash
+# Contoh mengajar tentang Dinosaurus:
+python scripts/llm_teacher_train.py --topic "Dinosaurus" --turns 3
+
+# Contoh mengajar tentang Robotika:
+python scripts/llm_teacher_train.py --topic "Robotika dan Otomasi" --turns 3
+```
+
+### B. Berganti-Ganti Topik per Turn (`--topics`)
+Anda dapat memberikan daftar topik yang dipisahkan tanda koma. Guru akan berganti topik di setiap giliran:
+```bash
+python scripts/llm_teacher_train.py --topics "Mobil Listrik,Robotika,Planet Mars,Kucing,Kopi Nusantara" --turns 5
+```
+
+### C. Memilih Paket Kategori Kurikulum Bawaan (`--category`)
+Tersedia bank materi terstruktur untuk mode offline:
+- `transportasi` (Mobil, Motor, Bus, Kereta Api, Pesawat, Helikopter, Kapal Laut)
+- `teknologi` (Komputer, AI, Robotika, Internet)
+- `sains` (Bumi, Mars, Gravitasi, Dinosaurus)
+- `biologi` (Kucing, Burung Elang, Hutan Hujan)
+- `kuliner` (Kopi Nusantara, Nasi Goreng)
+```bash
+python scripts/llm_teacher_train.py --category sains --turns 4
+python scripts/llm_teacher_train.py --category teknologi --turns 4
+```
+
+### D. Menggunakan File Materi Buatan Sendiri (`--materi-file`)
+Anda bisa membuat file teks paragraf (`.txt`) atau file `.jsonl` dan menyuruh guru mengajar dari file tersebut:
+```bash
+python scripts/llm_teacher_train.py --materi-file data/fakta_transportasi.txt --turns 5
+```
 
 ---
 
