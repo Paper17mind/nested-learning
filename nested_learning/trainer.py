@@ -211,9 +211,13 @@ class TextDataset:
         """Create dataset from list of question-answer dictionaries."""
         formatted = []
         for item in pairs:
-            q = item.get(question_key, "")
-            a = item.get(answer_key, "")
-            formatted.append(template.format(q=q, a=a))
+            if not isinstance(item, dict):
+                continue
+            q = item.get(question_key)
+            a = item.get(answer_key)
+            if not q or not a:
+                continue
+            formatted.append(template.format(q=str(q).strip(), a=str(a).strip()))
         joined = "".join(formatted)
         return cls.from_text(joined, tokenizer=tokenizer, seq_len=seq_len, stride=stride)
 

@@ -294,6 +294,11 @@ class SelfModifyingLayer(Module):
             memory = np.zeros((B, D, D), dtype=np.float32)
         else:
             memory = np.array(state, dtype=np.float32, copy=True)
+            if memory.shape[-1] != D or memory.shape[-2] != D:
+                raise ValueError(
+                    f"Memory state dimension mismatch: state has shape {memory.shape}, "
+                    f"but SelfModifyingLayer expects [..., {D}, {D}]. Reset state to None."
+                )
 
         memory_history = [memory]
         outputs = []

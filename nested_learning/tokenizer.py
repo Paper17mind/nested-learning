@@ -7,6 +7,7 @@ Includes:
 """
 
 import json
+import os
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 
@@ -196,3 +197,32 @@ def get_tokenizer(name: str = "byte", text_corpus: Optional[str] = None) -> Base
         return CharTokenizer()
     else:
         raise ValueError(f"Unknown tokenizer type '{name}'. Options: 'byte', 'char'.")
+
+
+def load_tokenizer(filepath: str) -> BaseTokenizer:
+    """Load a tokenizer instance from a saved JSON configuration file."""
+    with open(filepath, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    tok_type = data.get("type", "byte")
+    if tok_type == "char":
+        return CharTokenizer.load(filepath)
+    elif tok_type == "byte":
+        return ByteTokenizer.load(filepath)
+    else:
+        raise ValueError(f"Unknown tokenizer type '{tok_type}' in {filepath}")
+
+
+def resolve_tokenizer_for_checkpoint(checkpoint_path: str) -> BaseTokenizer:
+    """Find and load tokenizer associated with a checkpoint, or fallback to ByteTokenizer."""
+    candidates = [
+        checkpoint_path + ".tokenizer.json",
+        os.path.splitext(checkpoint_path)[0] + ".tokenizer.json",
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                return load_tokenizer(c)
+            except Exception:
+                pass
+    return ByteTokenizer()
+

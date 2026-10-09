@@ -510,12 +510,13 @@ def main():
     elif not os.path.exists(ckpt_path) and os.path.exists("models/hope_model.npz"):
         ckpt_path = "models/hope_model.npz"
 
-    tok = nl.ByteTokenizer()
+    tok = nl.resolve_tokenizer_for_checkpoint(ckpt_path)
 
     if os.path.exists(ckpt_path):
         print(f"Murid (Student): HOPE Lite dimuat dari '{ckpt_path}'")
         model, meta = nl.HOPE.load_checkpoint(ckpt_path)
         memory_state = meta.get("memory_state")
+        print(f"Tokenizer Murid: {tok.__class__.__name__} (Vocab: {tok.vocab_size})")
     else:
         print("Murid (Student): HOPE Lite baru (Fresh Initialization)")
         model = nl.HOPE(vocab_size=tok.vocab_size, d_model=48, n_layers=4, cms_tiers=[[2, 1], [2, 4]])
@@ -548,21 +549,34 @@ def main():
         print(f"\n┌────────────────────────────────────────────────────────────────────────┐")
         print(f"│ 📚 TURN {turn}/{args.turns}: {topic:<58} │")
         print(f"├────────────────────────────────────────────────────────────────────────┤")
-        print(f"│ 🧑‍🏫 GURU MENGAJAR:")
-        print(f"│   \"{lesson_text}\"")
 
-        # --- A. Murid Menguji Kuis SEBELUM Belajar (Pre-Test) ---
+        # --- A. Murid Mengecek Memori SEBELUM Belajar (Pre-Test) ---
         pre_quiz_tokens = tok.encode(quiz_prompt)
         pre_gen_ids = model.generate(
             pre_quiz_tokens,
             max_new_tokens=args.max_quiz_tokens,
             temperature=args.temperature,
             top_k=20,
+            state=memory_state,
         )
         pre_answer = tok.decode(pre_gen_ids)[len(quiz_prompt):].strip()
-        pre_score, pre_hits, _ = score_response(pre_answer, expected_keywords)
+        pre_score, pre_hits, total_kw = score_response(pre_answer, expected_keywords)
 
-        # --- B. Murid Belajar & Menyerap Materi (In-Chat Learning & Memory Update) ---
+        # --- B. Murid Aktif Tanya Balik jika Belum Tahu ---
+        is_unknown = pre_score < 40.0
+        if is_unknown:
+            inquiry = f"Guru, aku belum tahu tentang {topic}. Mohon jelaskan apa itu {topic} dan fakta kuncinya?"
+            print(f"│ 🤖 MURID TANYA BALIK (Belum Tahu):")
+            print(f"│   \"{inquiry}\"")
+            print(f"│")
+            print(f"│ 🧑‍🏫 GURU MENJAWAB & MENGAJAR:")
+            print(f"│   \"{lesson_text}\"")
+        else:
+            inquiry = f"Apa itu {topic}?"
+            print(f"│ 🧑‍🏫 GURU MEMPERDALAM MATERI:")
+            print(f"│   \"{lesson_text}\"")
+
+        # --- C. Murid Belajar & Menyerap Materi (In-Chat Learning & Memory Update) ---
         lesson_tokens = tok.encode(lesson_text)
         inp = np.array([lesson_tokens[:-1]], dtype=np.int64)
         tgt = np.array([lesson_tokens[1:]], dtype=np.int64)
@@ -582,13 +596,27 @@ def main():
             optimizer.step()
             turn_loss = float(loss_val)
 
-        # --- C. Murid Menguji Kuis SETELAH Belajar (Post-Test) ---
+        # 3. Otomatis Simpan Jawaban Guru ke Dataset JSONL (Auto-Saved Teacher QA)
+        os.makedirs("data", exist_ok=True)
+        qa_record = {
+            "turn": turn,
+            "topic": topic,
+            "student_question": inquiry,
+            "teacher_answer": lesson_text,
+            "quiz_prompt": quiz_prompt,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        with open("data/learned_teacher_qa.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps(qa_record, ensure_ascii=False) + "\n")
+
+        # --- D. Murid Menguji Kuis SETELAH Belajar (Post-Test) ---
         post_quiz_tokens = tok.encode(quiz_prompt)
         post_gen_ids = model.generate(
             post_quiz_tokens,
             max_new_tokens=args.max_quiz_tokens,
             temperature=args.temperature,
             top_k=20,
+            state=memory_state,
         )
         post_answer = tok.decode(post_gen_ids)[len(quiz_prompt):].strip()
         post_score, post_hits, total_kw = score_response(post_answer, expected_keywords)
@@ -602,6 +630,7 @@ def main():
         print(f"│   • Loss Pelajaran : {turn_loss:.4f} (Perplexity: {np.exp(min(15.0, turn_loss)):.2f})")
         print(f"│   • Memory M Norm  : {mem_norm:.4f}")
         print(f"│   • Skor Pemahaman : {post_score:.1f}% ({post_hits}/{total_kw} kata kunci cocok)")
+        print(f"│   • Auto-Saved     : 'data/learned_teacher_qa.jsonl'")
         print(f"└────────────────────────────────────────────────────────────────────────┘")
 
         history_records.append({

@@ -77,6 +77,35 @@ def parse_args():
     return parser.parse_args()
 
 
+def read_qa_records(filepath: str):
+    """Read QA records from either a JSON array file (.json) or JSON Lines file (.jsonl)."""
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+    if not content:
+        return []
+    if content.startswith("[") and content.endswith("]"):
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    records = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+            if isinstance(item, list):
+                records.extend(item)
+            elif isinstance(item, dict):
+                records.append(item)
+        except json.JSONDecodeError:
+            continue
+    return records
+
+
 def load_single_file(filepath, data_type, args, tokenizer):
     stride = args.stride if args.stride is not None else args.seq_len
     if data_type == "pdf" or filepath.lower().endswith(".pdf"):
@@ -86,13 +115,7 @@ def load_single_file(filepath, data_type, args, tokenizer):
     elif data_type == "jsonl":
         return nl.TextDataset.from_jsonl(filepath, tokenizer=tokenizer, text_key=args.text_key, seq_len=args.seq_len, stride=stride)
     elif data_type == "qa":
-        import json
-        pairs = []
-        with open(filepath, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    pairs.append(json.loads(line))
+        pairs = read_qa_records(filepath)
         return nl.TextDataset.from_qa_pairs(
             pairs,
             tokenizer=tokenizer,
@@ -112,7 +135,7 @@ def load_dataset(args, tokenizer):
 
     for p in raw_paths:
         if os.path.isdir(p):
-            for ext in ("*.txt", "*.md", "*.jsonl", "*.pdf"):
+            for ext in ("*.txt", "*.md", "*.jsonl", "*.json", "*.pdf"):
                 file_list.extend(glob.glob(os.path.join(p, ext)))
         elif "*" in p:
             file_list.extend(glob.glob(p))
@@ -131,9 +154,8 @@ def load_dataset(args, tokenizer):
             if fp.lower().endswith(".pdf"):
                 dt = "pdf"
             elif fp.lower().endswith(".jsonl") or fp.lower().endswith(".json"):
-                with open(fp, "r", encoding="utf-8") as f:
-                    first_line = f.readline().strip()
-                if "question" in first_line and "answer" in first_line:
+                recs = read_qa_records(fp)
+                if recs and isinstance(recs[0], dict) and (args.question_key in recs[0] or "question" in recs[0]):
                     dt = "qa"
                 else:
                     dt = "jsonl"
@@ -148,29 +170,83 @@ def load_dataset(args, tokenizer):
         print(f"Merging {len(datasets)} datasets into one combined corpus...")
         return nl.TextDataset.concat(datasets)
 
-def build_char_tokenizer_from_qa(path, question_key, answer_key):
-    import json
+def extract_raw_text_from_file(filepath, data_type, args):
+    """Extract raw text string from a file based on its type (text, pdf, jsonl, or qa)."""
+    if data_type == "pdf" or filepath.lower().endswith(".pdf"):
+        from nested_learning.trainer import extract_pdf_text
+        return extract_pdf_text(filepath)
+    elif data_type == "text" or filepath.lower().endswith((".txt", ".md")):
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    elif data_type in ("qa", "jsonl") or filepath.lower().endswith((".json", ".jsonl")):
+        recs = read_qa_records(filepath)
+        texts = []
+        is_qa = data_type == "qa" or (recs and isinstance(recs[0], dict) and (args.question_key in recs[0] or "question" in recs[0]))
+        if is_qa:
+            for item in recs:
+                if not isinstance(item, dict):
+                    continue
+                q = item.get(args.question_key) or item.get("question")
+                a = item.get(args.answer_key) or item.get("answer")
+                if q and a:
+                    texts.append(f"Pertanyaan: {str(q).strip()}\nJawaban: {str(a).strip()}\n\n")
+        else:
+            for item in recs:
+                if isinstance(item, dict):
+                    t = item.get(args.text_key) or item.get("text", "")
+                    if t:
+                        texts.append(str(t).strip() + "\n")
+                elif isinstance(item, str):
+                    texts.append(item.strip() + "\n")
+        return "".join(texts)
+    else:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
 
-    texts = []
 
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            if not line.strip():
-                continue
+def build_char_tokenizer_from_data(args):
+    """Build a CharTokenizer modularly from any data source in args.data."""
+    import glob
+    raw_paths = [p.strip() for p in args.data.split(",") if p.strip()]
+    file_list = []
+    for p in raw_paths:
+        if os.path.isdir(p):
+            for ext in ("*.txt", "*.md", "*.jsonl", "*.json", "*.pdf"):
+                file_list.extend(glob.glob(os.path.join(p, ext)))
+        elif "*" in p:
+            file_list.extend(glob.glob(p))
+        elif os.path.exists(p):
+            file_list.append(p)
+        else:
+            raise FileNotFoundError(f"Dataset path not found: {p}")
 
-            item = json.loads(line)
-            q = str(item.get(question_key, ""))
-            a = str(item.get(answer_key, ""))
+    if not file_list:
+        raise ValueError(f"No valid dataset files found for: {args.data}")
 
-            texts.append(
-                f"Pertanyaan: {q}\nJawaban: {a}\n\n"
-            )
+    corpus_parts = []
+    for fp in file_list:
+        dt = args.data_type
+        if dt == "auto":
+            if fp.lower().endswith(".pdf"):
+                dt = "pdf"
+            elif fp.lower().endswith((".jsonl", ".json")):
+                recs = read_qa_records(fp)
+                if recs and isinstance(recs[0], dict) and (args.question_key in recs[0] or "question" in recs[0]):
+                    dt = "qa"
+                else:
+                    dt = "jsonl"
+            else:
+                dt = "text"
+        txt = extract_raw_text_from_file(fp, dt, args)
+        if txt:
+            corpus_parts.append(txt)
 
-    if not texts:
-        raise ValueError("Dataset training kosong.")
+    if not corpus_parts:
+        raise ValueError(f"Dataset training kosong atau tidak ada teks valid di: {args.data}")
 
-    corpus = "".join(texts)
-    return nl.CharTokenizer.train_from_text(corpus)
+    full_corpus = "\n".join(corpus_parts)
+    return nl.CharTokenizer.train_from_text(full_corpus)
+
 
 def main():
     args = parse_args()
@@ -186,11 +262,7 @@ def main():
 
     # 1. Tokenizer
     if args.tokenizer == "char":
-        tok = build_char_tokenizer_from_qa(
-            args.data,
-            args.question_key,
-            args.answer_key,
-        )
+        tok = build_char_tokenizer_from_data(args)
     else:
         tok = nl.get_tokenizer(args.tokenizer)
 
@@ -204,28 +276,23 @@ def main():
     if args.val_data:
         val_args = argparse.Namespace(**vars(args))
         val_args.data = args.val_data
-        val_args.data_type = "qa"
+        val_args.data_type = args.data_type
 
         train_ds = full_ds
         val_ds = load_dataset(val_args, tok)
 
         print(
-            f"Train sequences: {len(train_ds)} "
-            f"| Validation sequences: {len(val_ds)}"
+            f"Train sequences: {len(train_ds)} ({len(train_ds.tokens):,} tokens) "
+            f"| Validation sequences: {len(val_ds)} ({len(val_ds.tokens):,} tokens)"
         )
-    else:
-        train_ds, val_ds = full_ds.train_val_split(
-            val_ratio=args.val_ratio
-    )
-
-    print(f"Total tokens: {len(full_ds.tokens):,} | Sequences: {len(full_ds)}")
-
-    if args.val_ratio > 0.0 and len(full_ds.tokens) > 100:
+    elif args.val_ratio > 0.0 and len(full_ds.tokens) > 100:
         train_ds, val_ds = full_ds.train_val_split(val_ratio=args.val_ratio)
-        print(f"Split: {len(train_ds.tokens):,} train tokens, {len(val_ds.tokens):,} val tokens")
+        print(f"Total tokens: {len(full_ds.tokens):,} | Sequences: {len(full_ds)}")
+        print(f"Split: {len(train_ds.tokens):,} train tokens ({len(train_ds)} seqs), {len(val_ds.tokens):,} val tokens ({len(val_ds)} seqs)")
     else:
         train_ds = full_ds
         val_ds = None
+        print(f"Total tokens: {len(full_ds.tokens):,} | Sequences: {len(full_ds)}")
         print("Training on 100% data (no validation split)")
 
     # 3. Model Architecture & Checkpoint Resume
@@ -268,12 +335,12 @@ def main():
 
     # 5. Training Loop
     save_path = args.save_path
-    tokenizer_path = save_path + ".tokenizer.json"
     if not os.path.dirname(save_path):
         save_path = os.path.join("models", save_path)
-    
-    tok.save(tokenizer_path)
     os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+
+    tokenizer_path = save_path + ".tokenizer.json"
+    tok.save(tokenizer_path)
 
     trainer = nl.Trainer(model, optimizer, loss_fn, tok)
     print(f"\nStarting training (output will save to '{save_path}')...")

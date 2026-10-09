@@ -1,15 +1,19 @@
 # Nested Learning Lite 🧠⚡
 
-> **Implementasi murni NumPy (Zero PyTorch Dependency) dari paradigma *Nested Learning* dan arsitektur *HOPE* (Google Research, NeurIPS 2025).**
+> **Implementasi eksperimental murni NumPy (Zero PyTorch Dependency) yang *terinspirasi oleh* paradigma *Nested Learning* dan arsitektur *HOPE* (Google Research, NeurIPS 2025).**
 
 [![Python: 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![Dependency: Pure NumPy](https://img.shields.io/badge/dependencies-NumPy%20only-green.svg)](https://numpy.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Referensi riset & implementasi:
+> [!NOTE]
+> **Disclaimer & Batasan:**
+> Proyek ini **bukan merupakan implementasi resmi atau replika 1:1** dari arsitektur HOPE maupun kode rilis Google Research. Proyek ini adalah **interpretasi independen & eksplorasi edukasional murni NumPy** yang mengadopsi prinsip-prinsip inti Nested Learning: perpaduan *Fast-Weight Associative Memory* (melalui inner-loop SGD delta rule per token) dan *Slow-Weight Continuum Memory System* (pembaruan gradien multi-frekuensi). Seluruh layer dirancang seringan mungkin agar dapat dipelajari, dilatih, dan dijalankan di CPU biasa tanpa pustaka deep learning eksternal.
+
+Referensi ilmiah & riset inspirasi:
 1. **Google Research Blog:** [Introducing Nested Learning: A new ML paradigm for continual learning](https://research.google/blog/introducing-nested-learning-a-new-ml-paradigm-for-continual-learning/)
-2. **Paper Resmi:** *Nested Learning: The Illusion of Deep Learning Architectures* (Behrouz, Razaviyayn, Zhong, Mirrokni — NeurIPS 2025)
-3. **Reference Repo:** [obekt/HOPE-nested-learning](https://github.com/obekt/HOPE-nested-learning)
+2. **Paper Riset:** *Nested Learning: The Illusion of Deep Learning Architectures* (Behrouz, Razaviyayn, Zhong, Mirrokni — NeurIPS 2025)
+3. **Reference Repo (PyTorch):** [obekt/HOPE-nested-learning](https://github.com/obekt/HOPE-nested-learning)
 
 ---
 
@@ -22,7 +26,7 @@ Model bahasa standar (LLM) mengalami **"Anterograde Amnesia"** dan **"Catastroph
 **Nested Learning membalik paradigma ini:**
 Arsitektur neural network dan algoritma optimasi bukanlah dua hal terpisah, melainkan **masalah optimasi multi-level yang saling bersarang (nested) dengan frekuensi pembaruan yang berbeda**.
 
-Versi **Lite** ini dibuat agar:
+Versi **Lite** ini dibuat sebagai studi kasus / eksplorasi agar:
 - ✅ **100% Bebas PyTorch / CUDA:** Hanya menggunakan Python standar dan NumPy.
 - ✅ **Sangat Ringan & Portabel:** Berjalan mulus di laptop standar, Raspberry Pi, VPS spek rendah, atau CPU apa pun tanpa instalasi gigabyte dependencies.
 - ✅ **Backpropagation Analitis Lengkap:** Turunan eksak (*closed-form exact analytical backward*) untuk semua layer, termasuk BPTT (Backpropagation Through Time) pada *gated delta rule* memori dinamis.
@@ -31,9 +35,9 @@ Versi **Lite** ini dibuat agar:
 
 ---
 
-## 📐 Arsitektur & Matematika HOPE
+## 📐 Desain Arsitektur (Terinspirasi Konsep HOPE)
 
-Arsitektur **HOPE** (*High-order Optimization & Perception Engine*) membagi pemrosesan menjadi dua lapisan memori:
+Model mengadopsi konsep pembagian pemrosesan menjadi dua lapisan memori:
 
 ```
 Input Tokens: x_t
@@ -231,6 +235,7 @@ python train.py --data data/contoh_teks.txt --epochs 5 --batch-size 4 --save-pat
 python train.py --data data/contoh_qa.jsonl --data-type qa --epochs 8 --save-path model_qa.npz
 ```
 Panduan mendalam cara membuat format data, pembagian train/val split, dan fine-tuning lanjutan tersedia di **[docs/DATASET_GUIDE.md](./docs/DATASET_GUIDE.md)**.
+Dokumentasi lengkap penjelasan arsitektur, pemrosesan data, dan bedah seluruh kode package `nested_learning` tersedia di **[docs/BEDAH_KODE_DAN_ARSITEKTUR.md](./docs/BEDAH_KODE_DAN_ARSITEKTUR.md)**.
 ---
 
 ## 💻 Contoh Penggunaan API Python

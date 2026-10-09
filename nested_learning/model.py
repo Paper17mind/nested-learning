@@ -207,6 +207,7 @@ class HOPE(Module):
         top_p: float = 0.0,
         repetition_penalty: float = 1.0,
         eos_token_id: Optional[int] = None,
+        state: Optional[np.ndarray] = None,
     ) -> List[int]:
         """Autoregressive text generation using O(N) state-passing inference.
 
@@ -218,6 +219,7 @@ class HOPE(Module):
             top_p: Top-p nucleus filtering (0.0 = disabled).
             repetition_penalty: Penalty for repeating tokens (1.0 = no penalty).
             eos_token_id: End of sequence token ID to terminate early.
+            state: Optional initial fast memory state [B, D, D] to retain prior context/memory.
 
         Returns:
             List of generated token IDs (including the prompt).
@@ -227,7 +229,7 @@ class HOPE(Module):
             prompt = prompt[np.newaxis, :]  # [1, T]
 
         # 1. Prefill phase: process full prompt and get initial memory state
-        logits, state = self.forward(prompt, state=None, last_only=True)
+        logits, state = self.forward(prompt, state=state, last_only=True)
         # logits is [1, 1, V]
         last_logits = logits[0, -1, :].copy()
 

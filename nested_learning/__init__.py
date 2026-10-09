@@ -31,6 +31,8 @@ from nested_learning.tokenizer import (
     ByteTokenizer,
     CharTokenizer,
     get_tokenizer,
+    load_tokenizer,
+    resolve_tokenizer_for_checkpoint,
 )
 from nested_learning.memory_store import SQLiteMemoryStore, memory_to_vector
 from nested_learning.trainer import TextDataset, Trainer
@@ -55,6 +57,8 @@ __all__ = [
     "ByteTokenizer",
     "CharTokenizer",
     "get_tokenizer",
+    "load_tokenizer",
+    "resolve_tokenizer_for_checkpoint",
     "TextDataset",
     "Trainer",
     "SQLiteMemoryStore",

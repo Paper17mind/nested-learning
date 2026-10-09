@@ -47,10 +47,11 @@ def main():
     cfg = model.get_config()
     print(f"Model: {model.count_parameters():,} params | d_model={cfg['d_model']} | layers={cfg['n_layers']} | tiers={cfg['cms_tiers']}")
 
-    tok = nl.ByteTokenizer()
-    prompt_tokens = tok.encode(args.prompt)
+    tok = nl.resolve_tokenizer_for_checkpoint(ckpt_path)
+    prompt_text = args.prompt.replace("\\n", "\n")
+    prompt_tokens = tok.encode(prompt_text)
 
-    print(f"\nPrompt: '{args.prompt}' ({len(prompt_tokens)} tokens)")
+    print(f"\nPrompt: '{prompt_text}' ({len(prompt_tokens)} tokens)")
     print(f"Sampling: temp={args.temperature}, top_k={args.top_k}, top_p={args.top_p}, rep_pen={args.repetition_penalty}")
     print("-" * 60)
 
