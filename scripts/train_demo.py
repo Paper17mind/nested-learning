@@ -7,9 +7,7 @@ demonstrating the continuum memory system and saving a checkpoint.
 import os
 import sys
 import time
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".")))
-
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import numpy as np
 import nested_learning as nl
 
@@ -93,7 +91,7 @@ def main():
     loss_fn = nl.CrossEntropyLoss(ignore_index=tok.pad_token_id)
 
     # 5. Training
-    checkpoint_file = "hope_model.npz"
+    checkpoint_file = "models/hope_model.npz"
     trainer = nl.Trainer(model, optimizer, loss_fn, tok)
 
     print("\nStarting training loop...")

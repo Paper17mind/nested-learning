@@ -114,7 +114,24 @@ nested-learning/
 │   ├── optimizers.py              # AdamW, SGD, NestedOptimizer (Deep Optimizer), CosineAnnealingLR
 │   ├── loss.py                    # CrossEntropyLoss dengan padding masking analitis
 │   ├── tokenizer.py               # ByteTokenizer (100% UTF-8) & CharTokenizer (zero dependency)
+│   ├── memory_store.py            # SQLite BLOB memory store & Vector DB embedding helper
 │   └── trainer.py                 # TextDataset & Trainer dengan multi-tier scheduling
+│
+├── data/                          # Folder Penyimpanan Data & Database
+│   ├── memory.db                  # Database SQLite penyimpan Fast-Weight Memory per user
+│   ├── fakta_transportasi.txt     # Kamus fakta transportasi darat, laut, dan udara
+│   ├── id_foundation_corpus.txt   # Korpus fondasi bahasa Indonesia (sains, geografi, AI)
+│   ├── id_instruction_qa.jsonl    # Dataset instruksi & tanya-jawab format JSONL
+│   └── wikipedia_id_articles.txt  # Artikel ensiklopedia resmi Wikipedia Indonesia
+│
+├── models/                        # Folder Penyimpanan Model Checkpoint (.npz)
+│   ├── hope_model.npz             # Model checkpoint hasil pelatihan demo
+│   └── hope_id.npz                # Model checkpoint hasil pelatihan bahasa Indonesia
+│
+├── scripts/                       # Skrip Pendukung & Eksperimen
+│   ├── download_datasets.py       # Pengunduh dataset MediaWiki Wikipedia ID (zero dependency)
+│   ├── train_demo.py              # Skrip demo latihan cepat (~4 detik di CPU)
+│   └── demo_continual_learning.py # Benchmark mitigasi Catastrophic Forgetting
 │
 ├── tests/                         # Behavioral & Mathematical Verification
 │   ├── test_equivalence.py        # O(N) state-passing == full sequence forward equivalence
@@ -123,10 +140,10 @@ nested-learning/
 │   ├── test_gradients.py          # Uji gradien numerik (finite differences) seluruh layer
 │   └── run_all_tests.py           # Master runner seluruh test suite
 │
-├── demo_continual_learning.py     # Benchmark mitigasi Catastrophic Forgetting
-├── train_demo.py                  # Demo pelatihan model HOPE (output: hope_model.npz)
-├── generate.py                    # CLI generasi teks mandiri
-├── chat.py                        # CLI chat interaktif + inspeksi matriks memori
+├── docs/                          # Dokumentasi Lengkap & Riwayat Sesi
+├── train.py                       # CLI Utama: Pelatihan fleksibel dataset kustom
+├── generate.py                    # CLI Utama: Generasi teks autoregresif O(N)
+├── chat.py                        # CLI Utama: Konsol chat interaktif + multi-session SQLite
 ├── requirements.txt               # numpy>=1.22.0
 ├── pyproject.toml                 # Package configuration
 └── README.md                      # Dokumentasi teknis
@@ -158,7 +175,7 @@ SUMMARY: 6/6 Test Suites PASSED in 0.13 seconds
 ### 3. Eksperimen Continual Learning (Mitigasi Lupa Katastropik)
 Uji perbandingan antara model baseline monolitik vs model HOPE bertingkat:
 ```bash
-python demo_continual_learning.py
+python scripts/demo_continual_learning.py
 ```
 Output benchmark:
 ```text
@@ -177,7 +194,7 @@ Retention Improvement with Nested Learning: 17.4% reduction in catastrophic forg
 ### 4. Melatih Model Demo
 Latih model HOPE di CPU dalam hitungan detik:
 ```bash
-python train_demo.py
+python scripts/train_demo.py
 ```
 Model dan metadata arsitektur akan disimpan ke `hope_model.npz`.
 
@@ -204,6 +221,16 @@ Perintah khusus dalam chat:
 - `/tokens <n>` : Mengubah panjang token balasan (misal `/tokens 60`).
 - `quit` atau `exit` : Keluar dari sesi.
 
+### 7. Melatih Dataset Kustom Anda Sendiri
+Gunakan skrip serbaguna `train.py` untuk melatih model pada dataset Anda:
+```bash
+# Melatih dari file teks (.txt / .md)
+python train.py --data data/contoh_teks.txt --epochs 5 --batch-size 4 --save-path model_saya.npz
+
+# Melatih dari dataset Tanya-Jawab (Q&A JSONL)
+python train.py --data data/contoh_qa.jsonl --data-type qa --epochs 8 --save-path model_qa.npz
+```
+Panduan mendalam cara membuat format data, pembagian train/val split, dan fine-tuning lanjutan tersedia di **[docs/DATASET_GUIDE.md](./docs/DATASET_GUIDE.md)**.
 ---
 
 ## 💻 Contoh Penggunaan API Python

@@ -36,11 +36,42 @@ Pertanyaan: Apa itu Nested Learning?
 Jawaban: Nested Learning adalah paradigma...
 ```
 
+### Format D: File Dokumen PDF (`.pdf`)
+Nested Learning Lite mendukung pembacaan teks langsung dari file dokumen PDF. Ekstraksi teks bekerja otomatis menggunakan library Python (`pypdf`/`pymupdf`), utilitas sistem (`pdftotext`), atau parser stream bita bawaan:
+- **Contoh berkas:** `data/contoh_dokumen.pdf`
+```bash
+python train.py --data data/contoh_dokumen.pdf --save-path model_pdf.npz
+```
+
 ---
 
 ## 2. Cara Melatih via Terminal (Skrip `train.py`)
+### ⚠️ Penting: Apakah Dataset Bertambah atau Me-Replace yang Ada?
 
-Anda dapat melatih model langsung dari terminal tanpa perlu menulis kode Python tambahan:
+Perilaku `train.py` terbagi menjadi dua aspek:
+
+1. **Dari Sisi File Dataset:**
+   - **Secara default (1 file):** Jika hanya memberikan 1 file `--data file_b.txt`, maka yang dibaca dan dilatih **hanya** `file_b.txt`.
+   - **Jika ingin dataset BERTAMBAH (digabung):** Anda bisa memasukkan beberapa file sekaligus dipisahkan tanda koma atau menggunakan direktori/wildcard:
+     ```bash
+     # Menggabungkan dua atau lebih file teks sekaligus:
+     python train.py --data data/file1.txt,data/file2.txt,data/file3.jsonl --epochs 5
+
+     # Menggabungkan seluruh file dalam satu folder:
+     python train.py --data data/ --epochs 5
+     ```
+     `train.py` akan otomatis menggabungkan seluruh file tersebut menjadi satu korpus besar!
+
+2. **Dari Sisi Model / Bobot Pengetahuan:**
+   - **Secara default (tanpa `--checkpoint`):** Model diinisialisasi **baru dari nol** (*fresh random weights*). Jika `--save-path` sama dengan nama file lama, file checkpoint lama akan **ditimpa (replace)**.
+   - **Jika ingin pengetahuan model BERTAMBAH (melanjutkan belajar / Continual Learning):** Tambahkan argumen `--checkpoint`:
+     ```bash
+     # Melanjutkan belajar dari checkpoint lama (pengetahuan bertambah, tidak reset):
+     python train.py --data data/pengetahuan_baru.txt --checkpoint hope_model.npz --save-path hope_model_v2.npz
+     ```
+     Dengan cara ini, bobot dari `hope_model.npz` dipertahankan dan dilatih lanjut pada data baru. Berkat **Slow Tiers** di HOPE, model tidak akan lupa ingatan lama (*mitigasi Catastrophic Forgetting*)!
+
+---
 
 ### A. Melatih dari File Teks Biasa
 ```bash
@@ -48,10 +79,26 @@ python train.py --data data/contoh_teks.txt --epochs 5 --batch-size 4 --save-pat
 ```
 
 ### B. Melatih dari Dataset Tanya-Jawab (Q&A JSONL)
+*(Catatan: argumen `--data-type qa` bersifat opsional karena sistem otomatis mendeteksinya)*:
 ```bash
-python train.py --data data/contoh_qa.jsonl --data-type qa --epochs 10 --save-path model_qa.npz
+python train.py --data data/contoh_qa.jsonl --epochs 8 --save-path model_qa.npz
 ```
 
+### C. Melatih Langsung Seluruh Isi Folder Sekaligus (`--data data/`)
+Anda cukup mengarahkan `--data` ke folder `data/`. Sistem akan otomatis memindai seluruh file `.txt`, `.md`, `.jsonl`, dan `.pdf`, mengekstrak teksnya, dan menggabungkannya menjadi satu korpus latihan besar:
+```bash
+python train.py --data data/ --epochs 5 --save-path model_semua.npz
+```
+
+### C. Melatih Gabungan Beberapa File Sekaligus (Dataset Bertambah)
+```bash
+python train.py --data data/contoh_teks.txt,data/contoh_qa.jsonl --epochs 5 --save-path model_gabungan.npz
+```
+
+### D. Melanjutkan Belajar dari Checkpoint yang Sudah Ada (Continual Learning)
+```bash
+python train.py --data data/contoh_qa.jsonl --checkpoint model_teks.npz --save-path model_gabungan_v2.npz
+```
 ### C. Melatih dengan Pengaturan Arsitektur Kustom
 ```bash
 python train.py \

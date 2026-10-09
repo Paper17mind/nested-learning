@@ -306,20 +306,35 @@ class HOPE(Module):
             "expansion": self.expansion,
         }
 
-    def save_checkpoint(self, filepath: str, extra_meta: Optional[Dict[str, Any]] = None) -> None:
-        """Save model weights and metadata to a compressed .npz archive."""
+    def save_checkpoint(
+        self,
+        filepath: str,
+        memory_state: Optional[np.ndarray] = None,
+        extra_meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Save model weights, optional fast-memory state, and metadata to a compressed .npz archive."""
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
         param_dict = {}
         for p in self.parameters():
             param_dict[p.name] = p.data
+
+        if memory_state is not None:
+            param_dict["__memory_state__"] = np.asarray(memory_state, dtype=np.float32)
 
         meta = {
             "config": self.get_config(),
             "extra": extra_meta or {},
         }
         meta_json = json.dumps(meta)
-
-        np.savez_compressed(filepath, __meta__=meta_json, **param_dict)
+        try:
+            np.savez_compressed(filepath, __meta__=meta_json, **param_dict)
+        except OSError as e:
+            if getattr(e, "errno", None) == 28:
+                raise OSError(
+                    f"[Errno 28] No space left on device: Ruang penyimpanan disk penuh saat menyimpan checkpoint '{filepath}'. "
+                    "Harap bersihkan ruang disk sistem Anda (misal: 'df -h', 'pip cache purge')."
+                ) from e
+            raise
 
     @classmethod
     def load_checkpoint(cls, filepath: str) -> Tuple["HOPE", Dict[str, Any]]:
@@ -342,5 +357,8 @@ class HOPE(Module):
                 p.data[...] = data[p.name]
             else:
                 raise KeyError(f"Parameter '{p.name}' missing from checkpoint {filepath}")
+        extra = meta.get("extra", {})
+        if "__memory_state__" in data:
+            extra["memory_state"] = data["__memory_state__"]
 
-        return model, meta.get("extra", {})
+        return model, extra

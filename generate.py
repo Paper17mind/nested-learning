@@ -17,7 +17,7 @@ import nested_learning as nl
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate text using Nested Learning Lite (HOPE)")
-    parser.add_argument("--checkpoint", type=str, default="hope_model.npz", help="Path to .npz model checkpoint")
+    parser.add_argument("--checkpoint", type=str, default="models/hope_model.npz", help="Path to .npz model checkpoint")
     parser.add_argument("--prompt", type=str, default="Nested Learning is", help="Input prompt text")
     parser.add_argument("--max-tokens", type=int, default=50, help="Maximum number of new tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature (0.0 = greedy)")
@@ -30,13 +30,20 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if not os.path.exists(args.checkpoint):
+    ckpt_path = args.checkpoint
+    if not os.path.exists(ckpt_path) and os.path.exists(os.path.join("models", ckpt_path)):
+        ckpt_path = os.path.join("models", ckpt_path)
+    elif not os.path.exists(ckpt_path) and os.path.exists(os.path.basename(ckpt_path)):
+        ckpt_path = os.path.basename(ckpt_path)
+
+    if not os.path.exists(ckpt_path):
         print(f"Checkpoint '{args.checkpoint}' not found.")
-        print("Please train a model first with: python train_demo.py")
+        print("Please train a model first with: python scripts/train_demo.py or python train.py")
         sys.exit(1)
 
-    print(f"Loading checkpoint from: {args.checkpoint}")
-    model, meta = nl.HOPE.load_checkpoint(args.checkpoint)
+    print(f"Loading checkpoint from: {ckpt_path}")
+    model, meta = nl.HOPE.load_checkpoint(ckpt_path)
+
     cfg = model.get_config()
     print(f"Model: {model.count_parameters():,} params | d_model={cfg['d_model']} | layers={cfg['n_layers']} | tiers={cfg['cms_tiers']}")
 

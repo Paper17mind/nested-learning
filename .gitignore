@@ -1,3 +1,9 @@
-*.npz
+__pycache__/
+*.py[cod]
 data/*
-__pycache__
+!data/.gitkeep
+models/*.npz
+!models/.gitkeep
+.env
+.env.local
+idwiki-latest-pages-articles.xml.bz2

@@ -32,8 +32,8 @@ from nested_learning.tokenizer import (
     CharTokenizer,
     get_tokenizer,
 )
+from nested_learning.memory_store import SQLiteMemoryStore, memory_to_vector
 from nested_learning.trainer import TextDataset, Trainer
-
 __all__ = [
     "Parameter",
     "Module",
@@ -57,6 +57,8 @@ __all__ = [
     "get_tokenizer",
     "TextDataset",
     "Trainer",
+    "SQLiteMemoryStore",
+    "memory_to_vector",
 ]
 
 __version__ = "0.1.0"
