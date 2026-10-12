@@ -47,7 +47,7 @@ class CrossEntropyLoss:
         exp_logits = np.exp(np.clip(logits_flat - max_logits, -35.0, 35.0))
         probs = exp_logits / (np.sum(exp_logits, axis=-1, keepdims=True) + 1e-12)
 
-        valid_mask = (targets_flat != self.ignore_index)
+        valid_mask = (targets_flat != self.ignore_index) & (targets_flat >= 0)
         n_valid = int(np.sum(valid_mask))
 
         if n_valid == 0:

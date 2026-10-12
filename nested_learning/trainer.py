@@ -6,6 +6,7 @@ Reference:
 """
 
 import math
+import os
 import time
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
@@ -202,24 +203,20 @@ class TextDataset:
         cls,
         pairs: List[Dict[str, str]],
         tokenizer: BaseTokenizer,
-        seq_len: int = 48,
+        seq_len: int = 128,
         stride: Optional[int] = None,
         question_key: str = "question",
         answer_key: str = "answer",
         template: str = "Pertanyaan: {q}\nJawaban: {a}\n\n",
-    ) -> "TextDataset":
-        """Create dataset from list of question-answer dictionaries."""
-        formatted = []
-        for item in pairs:
-            if not isinstance(item, dict):
-                continue
-            q = item.get(question_key)
-            a = item.get(answer_key)
-            if not q or not a:
-                continue
-            formatted.append(template.format(q=str(q).strip(), a=str(a).strip()))
-        joined = "".join(formatted)
-        return cls.from_text(joined, tokenizer=tokenizer, seq_len=seq_len, stride=stride)
+    ) -> "QADataset":
+        """Create structured QA dataset with prompt-loss masking and isolated samples."""
+        return QADataset(
+            pairs,
+            tokenizer=tokenizer,
+            seq_len=seq_len,
+            question_key=question_key,
+            answer_key=answer_key,
+        )
 
     def train_val_split(self, val_ratio: float = 0.15) -> Tuple["TextDataset", "TextDataset"]:
         """Split this dataset into train and validation TextDatasets."""
@@ -229,6 +226,7 @@ class TextDataset:
         train_ds = TextDataset(train_tokens, seq_len=self.seq_len, pad_token_id=self.pad_token_id, stride=self.stride)
         val_ds = TextDataset(val_tokens, seq_len=self.seq_len, pad_token_id=self.pad_token_id, stride=self.stride)
         return train_ds, val_ds
+
     def get_batches(
         self, batch_size: int, shuffle: bool = True
     ) -> Iterator[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
@@ -247,7 +245,7 @@ class TextDataset:
             B = len(batch_idx)
 
             inputs = np.full((B, self.seq_len), self.pad_token_id, dtype=np.int64)
-            targets = np.full((B, self.seq_len), self.pad_token_id, dtype=np.int64)
+            targets = np.full((B, self.seq_len), -100, dtype=np.int64)
             mask = np.zeros((B, self.seq_len), dtype=np.float32)
 
             for b, idx in enumerate(batch_idx):
@@ -262,6 +260,138 @@ class TextDataset:
                     inputs[b, :length] = inp_slice
                     targets[b, :length] = tgt_slice
                     mask[b, :length] = 1.0
+
+            yield inputs, targets, mask
+
+
+class QADataset:
+    """Supervised fine-tuning dataset for Question-Answer pairs with prompt-loss masking.
+
+    Each item is an isolated (Question, Answer) pair. QA boundaries are strictly preserved
+    (no cross-contamination between unrelated questions), and target positions corresponding
+    to the prompt tokens are masked with ignore_index (-100) so cross-entropy loss is computed
+    ONLY on the answer tokens.
+    """
+
+    def __init__(
+        self,
+        records: List[Dict[str, Any]],
+        tokenizer: BaseTokenizer,
+        seq_len: int = 128,
+        pad_token_id: int = 0,
+        ignore_index: int = -100,
+        question_key: str = "question",
+        answer_key: str = "answer",
+        template: str = "Pertanyaan: {q}\nJawaban: ",
+        answer_suffix: str = "\n\n",
+    ):
+        self.records = records
+        self.tokenizer = tokenizer
+        self.seq_len = seq_len
+        self.pad_token_id = pad_token_id
+        self.ignore_index = ignore_index
+        self.question_key = question_key
+        self.answer_key = answer_key
+        self.template = template
+        self.answer_suffix = answer_suffix
+
+        self.samples: List[Tuple[np.ndarray, np.ndarray, int]] = []
+        all_token_list: List[int] = []
+
+        for item in records:
+            if not isinstance(item, dict):
+                continue
+            q = item.get(question_key)
+            a = item.get(answer_key)
+            if not q or not a:
+                continue
+
+            q_text = self.template.format(q=str(q).strip())
+            a_text = str(a).strip() + self.answer_suffix
+
+            p_tokens = self.tokenizer.encode(q_text)
+            a_tokens = self.tokenizer.encode(a_text)
+
+            full = p_tokens + a_tokens
+            all_token_list.extend(full)
+
+            # Limit to seq_len + 1 tokens (1 extra for autoregressive target shift)
+            if len(full) > self.seq_len + 1:
+                full = full[: self.seq_len + 1]
+
+            if len(full) < 2:
+                continue
+
+            inp = np.array(full[:-1], dtype=np.int64)
+            tgt = np.array(full[1:], dtype=np.int64)
+
+            # Prompt masking:
+            # Token at index i in tgt predicts full[i+1].
+            # For i+1 < len(p_tokens), target is predicting a prompt token -> mask out!
+            # The first answer token is at index len(p_tokens), predicted at i = len(p_tokens) - 1.
+            n_prompt_targets = max(0, len(p_tokens) - 1)
+            tgt[: min(len(tgt), n_prompt_targets)] = self.ignore_index
+
+            self.samples.append((inp, tgt, len(p_tokens)))
+
+        self.tokens = np.array(all_token_list, dtype=np.int64)
+        self.starts = list(range(len(self.samples)))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def train_val_split(self, val_ratio: float = 0.15) -> Tuple["QADataset", "QADataset"]:
+        """Clean record-level train/validation split (no token cutting mid-sentence)."""
+        n = len(self.records)
+        split_idx = int(n * (1.0 - val_ratio))
+        train_records = self.records[:split_idx]
+        val_records = self.records[split_idx:]
+        train_ds = QADataset(
+            train_records,
+            tokenizer=self.tokenizer,
+            seq_len=self.seq_len,
+            pad_token_id=self.pad_token_id,
+            ignore_index=self.ignore_index,
+            question_key=self.question_key,
+            answer_key=self.answer_key,
+            template=self.template,
+            answer_suffix=self.answer_suffix,
+        )
+        val_ds = QADataset(
+            val_records,
+            tokenizer=self.tokenizer,
+            seq_len=self.seq_len,
+            pad_token_id=self.pad_token_id,
+            ignore_index=self.ignore_index,
+            question_key=self.question_key,
+            answer_key=self.answer_key,
+            template=self.template,
+            answer_suffix=self.answer_suffix,
+        )
+        return train_ds, val_ds
+
+    def get_batches(
+        self, batch_size: int, shuffle: bool = True
+    ) -> Iterator[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+        """Yield batches of (inputs, targets, mask) with individual sample padding and prompt masking."""
+        indices = np.arange(len(self.samples))
+        if shuffle:
+            np.random.shuffle(indices)
+
+        for i in range(0, len(indices), batch_size):
+            batch_idx = indices[i : i + batch_size]
+            B = len(batch_idx)
+
+            inputs = np.full((B, self.seq_len), self.pad_token_id, dtype=np.int64)
+            targets = np.full((B, self.seq_len), self.ignore_index, dtype=np.int64)
+            mask = np.zeros((B, self.seq_len), dtype=np.float32)
+
+            for b, idx in enumerate(batch_idx):
+                inp, tgt, _ = self.samples[idx]
+                L = min(len(inp), self.seq_len)
+                inputs[b, :L] = inp[:L]
+                targets[b, :L] = tgt[:L]
+                mask[b, :L] = 1.0
 
             yield inputs, targets, mask
 
@@ -303,7 +433,7 @@ class Trainer:
         return float(loss)
 
     def evaluate(
-        self, dataset: TextDataset, batch_size: int = 4, max_batches: int = 25
+        self, dataset: Union[TextDataset, QADataset], batch_size: int = 4, max_batches: int = 25
     ) -> Dict[str, float]:
         """Compute evaluation loss and perplexity on dataset (capped at max_batches)."""
         total_loss = 0.0
@@ -328,8 +458,8 @@ class Trainer:
 
     def train(
         self,
-        train_dataset: TextDataset,
-        val_dataset: Optional[TextDataset] = None,
+        train_dataset: Union[TextDataset, QADataset],
+        val_dataset: Optional[Union[TextDataset, QADataset]] = None,
         epochs: int = 5,
         batch_size: int = 4,
         accumulate_grad: int = 1,
@@ -356,11 +486,12 @@ class Trainer:
             Dictionary containing training history and best metrics.
         """
         best_val_loss = float("inf")
+        best_train_loss = float("inf")
         step = 0
         running_loss = 0.0
         steps_since_log = 0
         start_time = time.time()
-        steps_per_epoch = (len(train_dataset.starts) + batch_size - 1) // batch_size
+        steps_per_epoch = (len(train_dataset) + batch_size - 1) // batch_size
         effective_steps_per_epoch = max(1, steps_per_epoch // max(1, accumulate_grad))
         estimated_total_steps = effective_steps_per_epoch * epochs
         total_target_steps = min(max_steps, estimated_total_steps) if max_steps is not None else estimated_total_steps
@@ -403,6 +534,16 @@ class Trainer:
                                             "val_loss": best_val_loss,
                                         },
                                     )
+                        elif checkpoint_path and avg_train_loss < best_train_loss:
+                            best_train_loss = avg_train_loss
+                            self.model.save_checkpoint(
+                                checkpoint_path,
+                                extra_meta={
+                                    "step": step,
+                                    "epoch": epoch,
+                                    "train_loss": best_train_loss,
+                                },
+                            )
 
                         elapsed = time.time() - start_time
                         lr_now = (
@@ -451,6 +592,9 @@ class Trainer:
         if accum_count > 0:
             self.optimizer.step()
             self.optimizer.zero_grad()
+
+        if checkpoint_path and not os.path.exists(checkpoint_path):
+            self.model.save_checkpoint(checkpoint_path, extra_meta={"step": step, "final_loss": best_train_loss})
 
         return {
             "total_steps": step,

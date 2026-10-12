@@ -48,7 +48,8 @@ def parse_args():
     parser.add_argument("--checkpoint", type=str, default=None,
                         help="Path to existing model checkpoint (.npz) to continue training (Continual Learning). "
                              "If omitted, a new model is initialized from scratch.")
-    parser.add_argument("--data-type", type=str, default="auto", choices=["auto", "text", "jsonl", "qa", "pdf"],
+    parser.add_argument("--data-type", "--format", dest="data_type", type=str, default="auto",
+                        choices=["auto", "text", "jsonl", "qa", "pdf"],
                         help="Data format: 'auto', 'text', 'jsonl', 'qa', or 'pdf'")
     parser.add_argument("--text-key", type=str, default="text", help="JSON key containing text (for jsonl)")
     parser.add_argument("--question-key", type=str, default="question", help="Question key (for qa)")
@@ -116,11 +117,10 @@ def load_single_file(filepath, data_type, args, tokenizer):
         return nl.TextDataset.from_jsonl(filepath, tokenizer=tokenizer, text_key=args.text_key, seq_len=args.seq_len, stride=stride)
     elif data_type == "qa":
         pairs = read_qa_records(filepath)
-        return nl.TextDataset.from_qa_pairs(
+        return nl.QADataset(
             pairs,
             tokenizer=tokenizer,
             seq_len=args.seq_len,
-            stride=stride,
             question_key=args.question_key,
             answer_key=args.answer_key,
         )
@@ -168,6 +168,17 @@ def load_dataset(args, tokenizer):
         return datasets[0]
     else:
         print(f"Merging {len(datasets)} datasets into one combined corpus...")
+        if all(isinstance(d, nl.QADataset) for d in datasets):
+            all_records = []
+            for d in datasets:
+                all_records.extend(d.records)
+            return nl.QADataset(
+                all_records,
+                tokenizer=tokenizer,
+                seq_len=args.seq_len,
+                question_key=args.question_key,
+                answer_key=args.answer_key,
+            )
         return nl.TextDataset.concat(datasets)
 
 def extract_raw_text_from_file(filepath, data_type, args):
@@ -260,18 +271,55 @@ def main():
     print("TRAINING NESTED LEARNING (HOPE) ON CUSTOM DATASET")
     print("=" * 70)
 
-    # 1. Tokenizer
-    if args.tokenizer == "char":
-        tok = build_char_tokenizer_from_data(args)
+    # 1. Model Architecture & Checkpoint / Tokenizer Resolution
+    if args.checkpoint:
+        ckpt_path = args.checkpoint
+        if not os.path.exists(ckpt_path) and os.path.exists(os.path.join("models", ckpt_path)):
+            ckpt_path = os.path.join("models", ckpt_path)
+        if not os.path.exists(ckpt_path):
+            raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint} (also checked models/{args.checkpoint})")
+        print(f"\n[Continual Learning Mode] Resuming model from checkpoint: '{ckpt_path}'")
+        model, meta = nl.HOPE.load_checkpoint(ckpt_path)
+        cfg = model.get_config()
+        print(f"HOPE Model: {model.count_parameters():,} params | d_model={cfg['d_model']} | layers={cfg['n_layers']} | vocab_size={cfg['vocab_size']}")
+        print(f"CMS Tiers (retained from checkpoint): {cfg['cms_tiers']}")
+
+        # Auto-match tokenizer with checkpoint
+        if "--tokenizer" not in sys.argv:
+            tok = nl.resolve_tokenizer_for_checkpoint(ckpt_path)
+        elif args.tokenizer == "char":
+            tok = build_char_tokenizer_from_data(args)
+        else:
+            tok = nl.get_tokenizer(args.tokenizer)
+
+        if tok.vocab_size != model.vocab_size:
+            print(f"[Warning]: Specified tokenizer vocab ({tok.vocab_size}) does not match checkpoint model vocab ({model.vocab_size}).")
+            print(f"           Automatically restoring checkpoint's native tokenizer to prevent indexing mismatch...")
+            tok = nl.resolve_tokenizer_for_checkpoint(ckpt_path)
     else:
-        tok = nl.get_tokenizer(args.tokenizer)
+        # Tokenizer for fresh initialization
+        if args.tokenizer == "char":
+            tok = build_char_tokenizer_from_data(args)
+        else:
+            tok = nl.get_tokenizer(args.tokenizer)
+
+        print("\n[Fresh Initialization] Initializing brand new HOPE model from scratch...")
+        cms_tiers = parse_tiers(args.cms_tiers, args.n_layers)
+        model = nl.HOPE(
+            vocab_size=tok.vocab_size,
+            d_model=args.d_model,
+            n_layers=args.n_layers,
+            cms_tiers=cms_tiers,
+        )
+        print(f"HOPE Model: {model.count_parameters():,} params | d_model={args.d_model} | layers={args.n_layers} | vocab_size={tok.vocab_size}")
+        print(f"CMS Tiers: {cms_tiers}")
 
     print(
         f"Tokenizer: {tok.__class__.__name__} "
         f"| Vocab: {tok.vocab_size}"
     )
 
-    # 2. Dataset
+    # 2. Dataset (encoded with the matching tokenizer)
     full_ds = load_dataset(args, tok)
     if args.val_data:
         val_args = argparse.Namespace(**vars(args))
@@ -294,30 +342,6 @@ def main():
         val_ds = None
         print(f"Total tokens: {len(full_ds.tokens):,} | Sequences: {len(full_ds)}")
         print("Training on 100% data (no validation split)")
-
-    # 3. Model Architecture & Checkpoint Resume
-    if args.checkpoint:
-        ckpt_path = args.checkpoint
-        if not os.path.exists(ckpt_path) and os.path.exists(os.path.join("models", ckpt_path)):
-            ckpt_path = os.path.join("models", ckpt_path)
-        if not os.path.exists(ckpt_path):
-            raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint} (also checked models/{args.checkpoint})")
-        print(f"\n[Continual Learning Mode] Resuming model from checkpoint: '{ckpt_path}'")
-        model, meta = nl.HOPE.load_checkpoint(ckpt_path)
-        cfg = model.get_config()
-        print(f"HOPE Model: {model.count_parameters():,} params | d_model={cfg['d_model']} | layers={cfg['n_layers']}")
-        print(f"CMS Tiers (retained from checkpoint): {cfg['cms_tiers']}")
-    else:
-        print("\n[Fresh Initialization] Initializing brand new HOPE model from scratch...")
-        cms_tiers = parse_tiers(args.cms_tiers, args.n_layers)
-        model = nl.HOPE(
-            vocab_size=tok.vocab_size,
-            d_model=args.d_model,
-            n_layers=args.n_layers,
-            cms_tiers=cms_tiers,
-        )
-        print(f"HOPE Model: {model.count_parameters():,} params | d_model={args.d_model} | layers={args.n_layers}")
-        print(f"CMS Tiers: {cms_tiers}")
     # 4. Optimizer & Scheduler
     scheduler = nl.CosineAnnealingLR(
         base_lr=args.lr,
@@ -331,7 +355,7 @@ def main():
         scheduler=scheduler,
         grad_clip=1.0,
     )
-    loss_fn = nl.CrossEntropyLoss(ignore_index=tok.pad_token_id)
+    loss_fn = nl.CrossEntropyLoss(ignore_index=-100)
 
     # 5. Training Loop
     save_path = args.save_path
