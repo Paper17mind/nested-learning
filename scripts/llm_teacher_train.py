@@ -67,6 +67,7 @@ load_dotenv()
 
 class BaseTeacher:
     """Base class for LLM teachers."""
+    stage: str = "none"
 
     def get_lesson_and_quiz(self, turn_idx: int, topic_hint: Optional[str] = None) -> Dict[str, Any]:
         """Return dict with 'topic', 'lesson', 'quiz_prompt', 'expected_keywords'."""
@@ -77,125 +78,125 @@ CURRICULUM_BANK = {
     "transportasi": [
         {
             "topic": "Transportasi Darat: Mobil",
-            "lesson": "Mobil adalah alat transportasi darat yang memiliki roda 4 dan digerakkan oleh mesin. Mobil digunakan untuk mengangkut penumpang dan barang di jalan raya.",
+            "lesson": "Mobil adalah alat transportasi darat beroda empat.",
             "quiz_prompt": "Mobil adalah",
-            "expected_keywords": ["alat", "transportasi", "darat", "roda", "4", "mesin"],
+            "expected_keywords": ["alat", "transportasi", "darat", "roda", "empat"],
         },
         {
             "topic": "Transportasi Darat: Sepeda Motor",
-            "lesson": "Sepeda motor adalah alat transportasi darat roda 2 yang digerakkan oleh mesin berbahan bakar atau listrik. Pengendara motor wajib mengenakan helm keselamatan.",
+            "lesson": "Sepeda motor adalah kendaraan darat beroda dua.",
             "quiz_prompt": "Sepeda motor adalah",
-            "expected_keywords": ["alat", "transportasi", "darat", "roda", "2", "mesin"],
+            "expected_keywords": ["kendaraan", "darat", "roda", "dua"],
         },
         {
             "topic": "Transportasi Udara: Pesawat Terbang",
-            "lesson": "Pesawat terbang adalah alat transportasi udara yang memiliki sayap dan mesin jet untuk terbang di angkasa. Pesawat dikemudikan oleh seorang pilot di dalam kokpit.",
+            "lesson": "Pesawat terbang adalah alat transportasi udara bersayap.",
             "quiz_prompt": "Pesawat terbang adalah",
-            "expected_keywords": ["alat", "transportasi", "udara", "sayap", "terbang", "pilot"],
+            "expected_keywords": ["alat", "transportasi", "udara", "bersayap"],
         },
         {
             "topic": "Transportasi Laut: Kapal Laut",
-            "lesson": "Kapal laut adalah alat transportasi air berukuran besar yang berlayar mengarungi lautan dan samudera. Kapal laut dinakhodai oleh seorang kapten atau nakhoda.",
+            "lesson": "Kapal laut adalah alat transportasi di atas air.",
             "quiz_prompt": "Kapal laut adalah",
-            "expected_keywords": ["alat", "transportasi", "air", "berlayar", "lautan", "nakhoda"],
+            "expected_keywords": ["alat", "transportasi", "air"],
         },
         {
             "topic": "Transportasi Rel: Kereta Api",
-            "lesson": "Kereta api adalah alat transportasi darat yang berjalan di atas lintasan rel besi. Kereta api ditarik oleh lokomotif dan dikemudikan oleh masinis.",
+            "lesson": "Kereta api adalah kendaraan darat di atas rel.",
             "quiz_prompt": "Kereta api adalah",
-            "expected_keywords": ["alat", "transportasi", "darat", "rel", "besi", "masinis"],
+            "expected_keywords": ["kendaraan", "darat", "rel"],
         },
         {
             "topic": "Transportasi Udara: Helikopter",
-            "lesson": "Helikopter adalah alat transportasi udara bersayap putar yang dapat lepas landas dan mendarat secara vertikal di tempat sempit tanpa landasan pacu.",
+            "lesson": "Helikopter adalah pesawat udara dengan baling-baling putar.",
             "quiz_prompt": "Helikopter adalah",
-            "expected_keywords": ["alat", "transportasi", "udara", "putar", "vertikal", "landas"],
+            "expected_keywords": ["pesawat", "udara", "baling", "putar"],
         },
     ],
     "teknologi": [
         {
             "topic": "Teknologi: Komputer",
-            "lesson": "Komputer adalah perangkat elektronik canggih yang mampu mengolah data digital, menjalankan program perangkat lunak, dan memproses perhitungan matematis rumit.",
+            "lesson": "Komputer adalah alat elektronik untuk mengolah data.",
             "quiz_prompt": "Komputer adalah",
-            "expected_keywords": ["perangkat", "elektronik", "data", "digital", "program"],
+            "expected_keywords": ["alat", "elektronik", "mengolah", "data"],
         },
         {
             "topic": "Teknologi: Kecerdasan Buatan (AI)",
-            "lesson": "Kecerdasan buatan adalah bidang ilmu komputer yang bertujuan membuat mesin cerdas yang mampu belajar dari data dan meniru fungsi kognitif manusia.",
+            "lesson": "Kecerdasan buatan adalah teknologi komputer peniru akal manusia.",
             "quiz_prompt": "Kecerdasan buatan adalah",
-            "expected_keywords": ["ilmu", "komputer", "cerdas", "belajar", "data", "manusia"],
+            "expected_keywords": ["teknologi", "komputer", "akal", "manusia"],
         },
         {
             "topic": "Teknologi: Robotika",
-            "lesson": "Robotika adalah bidang teknologi rekayasa yang merancang dan membuat robot otonom untuk membantu pekerjaan manusia di industri dan eksplorasi ruang angkasa.",
+            "lesson": "Robotika adalah bidang teknologi perancangan mesin otomatis.",
             "quiz_prompt": "Robotika adalah",
-            "expected_keywords": ["teknologi", "merancang", "robot", "pekerjaan", "manusia"],
+            "expected_keywords": ["teknologi", "mesin", "otomatis"],
         },
         {
             "topic": "Teknologi: Jaringan Internet",
-            "lesson": "Internet adalah jaringan telekomunikasi global yang menghubungkan miliaran komputer dan gawai di seluruh dunia menggunakan protokol komunikasi standar.",
+            "lesson": "Internet adalah jaringan global penghubung komputer dunia.",
             "quiz_prompt": "Internet adalah",
-            "expected_keywords": ["jaringan", "telekomunikasi", "global", "komputer", "dunia"],
+            "expected_keywords": ["jaringan", "global", "komputer", "dunia"],
         },
     ],
     "sains": [
         {
             "topic": "Sains: Planet Bumi",
-            "lesson": "Bumi adalah planet ketiga dari Matahari dalam tata surya yang memiliki kehidupan, oksigen, dan air cair. Bumi berputar pada porosnya setiap 24 jam.",
+            "lesson": "Bumi adalah planet dalam tata surya tempat kehidupan.",
             "quiz_prompt": "Bumi adalah",
-            "expected_keywords": ["planet", "tata", "surya", "kehidupan", "air"],
+            "expected_keywords": ["planet", "tata", "surya", "kehidupan"],
         },
         {
             "topic": "Sains: Planet Mars",
-            "lesson": "Mars adalah planet keempat dari Matahari yang sering dijuluki Planet Merah karena kandungan besi oksida yang melimpah pada permukaannya yang gersang.",
+            "lesson": "Mars adalah planet merah terdekat dari matahari.",
             "quiz_prompt": "Mars adalah",
-            "expected_keywords": ["planet", "merah", "matahari", "besi", "oksida"],
+            "expected_keywords": ["planet", "merah", "matahari"],
         },
         {
             "topic": "Sains: Hukum Gravitasi",
-            "lesson": "Gravitasi adalah gaya tarik-menarik mendasar yang bekerja antara semua benda yang memiliki massa di alam semesta. Gravitasi menjaga planet tetap mengorbit bintang.",
+            "lesson": "Gravitasi adalah gaya tarik mendasar antar benda bermassa.",
             "quiz_prompt": "Gravitasi adalah",
-            "expected_keywords": ["gaya", "tarik", "massa", "alam", "semesta", "orbit"],
+            "expected_keywords": ["gaya", "tarik", "benda", "massa"],
         },
         {
             "topic": "Sains: Dinosaurus",
-            "lesson": "Dinosaurus adalah kelompok hewan reptil purba raksasa yang mendominasi daratan bumi pada zaman Mesozoikum sebelum punah puluhan juta tahun yang lalu.",
+            "lesson": "Dinosaurus adalah hewan reptil purba yang telah punah.",
             "quiz_prompt": "Dinosaurus adalah",
-            "expected_keywords": ["hewan", "reptil", "purba", "bumi", "punah"],
+            "expected_keywords": ["hewan", "reptil", "purba", "punah"],
         },
     ],
     "biologi": [
         {
             "topic": "Biologi: Kucing",
-            "lesson": "Kucing adalah hewan mamalia karnivora domestik berkaki empat yang memiliki cakar lentik dan pendengaran tajam. Kucing banyak dipelihara manusia sebagai sahabat setia.",
+            "lesson": "Kucing adalah hewan mamalia karnivora peliharaan manusia.",
             "quiz_prompt": "Kucing adalah",
-            "expected_keywords": ["hewan", "mamalia", "karnivora", "empat", "pelihara"],
+            "expected_keywords": ["hewan", "mamalia", "peliharaan", "manusia"],
         },
         {
             "topic": "Biologi: Burung Elang",
-            "lesson": "Burung elang adalah burung pemangsa berukuran besar yang memiliki penglihatan sangat tajam, paruh berkait kokoh, dan sayap lebar untuk terbang membubung tinggi.",
+            "lesson": "Burung elang adalah burung pemangsa berlihatan tajam.",
             "quiz_prompt": "Burung elang adalah",
-            "expected_keywords": ["burung", "pemangsa", "penglihatan", "tajam", "sayap"],
+            "expected_keywords": ["burung", "pemangsa", "tajam"],
         },
         {
             "topic": "Biologi: Hutan Hujan Tropis",
-            "lesson": "Hutan hujan tropis adalah bioma hutan lebat beriklim basah yang menjadi rumah bagi lebih dari separuh spesies tumbuhan dan satwa liar di muka bumi.",
+            "lesson": "Hutan hujan tropis adalah bioma hutan lebat kaya tumbuhan.",
             "quiz_prompt": "Hutan hujan tropis adalah",
-            "expected_keywords": ["hutan", "lebat", "spesies", "tumbuhan", "satwa"],
+            "expected_keywords": ["hutan", "lebat", "tumbuhan"],
         },
     ],
     "kuliner": [
         {
             "topic": "Kuliner: Kopi Nusantara",
-            "lesson": "Kopi adalah minuman seduhan populer berkafein yang dihasilkan dari pengolahan biji tanaman kopi sangrai. Indonesia terkenal dengan kopi arabika dan robusta berkualitas.",
+            "lesson": "Kopi adalah minuman seduhan nikmat dari biji sangrai.",
             "quiz_prompt": "Kopi adalah",
-            "expected_keywords": ["minuman", "seduhan", "biji", "kopi", "indonesia"],
+            "expected_keywords": ["minuman", "seduhan", "biji", "sangrai"],
         },
         {
             "topic": "Kuliner: Nasi Goreng",
-            "lesson": "Nasi goreng adalah hidangan khas berupa nasi yang digoreng bersama bumbu rempah, kecap manis, telur, dan lauk pelengkap di atas wajan panas.",
+            "lesson": "Nasi goreng adalah hidangan nasi berbumbu khas rempah.",
             "quiz_prompt": "Nasi goreng adalah",
-            "expected_keywords": ["hidangan", "nasi", "goreng", "bumbu", "rempah"],
+            "expected_keywords": ["hidangan", "nasi", "bumbu", "rempah"],
         },
     ],
 }
@@ -204,7 +205,14 @@ CURRICULUM_BANK = {
 class CurriculumTeacher(BaseTeacher):
     """Built-in structured Indonesian curriculum teacher with diverse category banks."""
 
-    def __init__(self, category: str = "all", custom_file: Optional[str] = None):
+    def __init__(self, category: str = "all", custom_file: Optional[str] = None, stage: str = "none"):
+        self.stage = stage
+        self.dev_items = []
+        if stage in ("bayi", "batita", "balita", "anak", "grow") and os.path.exists("data/developmental_qa.jsonl"):
+            with open("data/developmental_qa.jsonl", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        self.dev_items.append(json.loads(line))
         self.curriculum: List[Dict[str, Any]] = []
 
         if custom_file and os.path.exists(custom_file):
@@ -242,23 +250,51 @@ class CurriculumTeacher(BaseTeacher):
         return items
 
     def get_lesson_and_quiz(self, turn_idx: int, topic_hint: Optional[str] = None) -> Dict[str, Any]:
+        if self.stage != "none" and self.dev_items:
+            stage_map = {1: "bayi", 2: "batita", 3: "balita", 4: "anak"}
+            if self.stage == "grow":
+                curr_stage = stage_map.get(min(4, turn_idx), "anak")
+            else:
+                curr_stage = self.stage
+
+            stage_pool = [it for it in self.dev_items if it.get("stage_name") == curr_stage]
+            if not stage_pool:
+                stage_pool = self.dev_items
+            it = stage_pool[(turn_idx - 1) % len(stage_pool)]
+            return {
+                "topic": f"[{curr_stage.upper()}] {it['topic']}",
+                "lesson": it["answer"],
+                "quiz_question": it["question"],
+                "quiz_prompt": it["prompt"],
+                "expected_keywords": it["keywords"],
+            }
+
         if topic_hint:
             hint_lower = topic_hint.lower().strip()
             # Search for topic matching hint
             for item in self.curriculum:
                 if hint_lower in item["topic"].lower() or hint_lower in item["lesson"].lower():
-                    return item
+                    res = dict(item)
+                    if "quiz_question" not in res:
+                        clean_name = res["topic"].split(": ")[-1] if ": " in res["topic"] else res["topic"]
+                        res["quiz_question"] = f"Apa yang dimaksud dengan {clean_name}?"
+                    return res
             # If not in bank, generate dynamic lesson on this topic
             words = topic_hint.split()
             return {
                 "topic": f"Topik Kustom: {topic_hint}",
                 "lesson": f"{topic_hint} adalah konsep penting yang memiliki karakteristik unik dan peran besar dalam peradaban manusia.",
+                "quiz_question": f"Apa yang dimaksud dengan {topic_hint}?",
                 "quiz_prompt": f"{topic_hint} adalah",
                 "expected_keywords": [w.lower() for w in words] + ["konsep", "penting", "peran"],
             }
 
         idx = (turn_idx - 1) % len(self.curriculum)
-        return self.curriculum[idx]
+        res = dict(self.curriculum[idx])
+        if "quiz_question" not in res:
+            clean_name = res["topic"].split(": ")[-1] if ": " in res["topic"] else res["topic"]
+            res["quiz_question"] = f"Apa yang dimaksud dengan {clean_name}?"
+        return res
 
 class OllamaTeacher(BaseTeacher):
     """Teacher powered by a local Ollama LLM instance."""
@@ -278,19 +314,29 @@ class OllamaTeacher(BaseTeacher):
 
     def get_lesson_and_quiz(self, turn_idx: int, topic_hint: Optional[str] = None) -> Dict[str, Any]:
         target_topic = topic_hint or f"topik umum ke-{turn_idx} (misal: sains, teknologi, biologi, transportasi, sejarah)"
-        prompt = (
-            f"Anda adalah Guru AI untuk model bahasa pemula. Buat 1 pelajaran singkat (2-3 kalimat) dalam bahasa Indonesia "
-            f"tentang: '{target_topic}'. "
-            f"Keluarkan format JSON murni persis seperti ini:\n"
-            f'{{"topic": "{target_topic}", "lesson": "teks pelajaran singkat", "quiz_prompt": "kata awal untuk kuis", "expected_keywords": ["kata1", "kata2"]}}\n'
-            f"HANYA keluarkan JSON tanpa penjelasan markdown."
-        )
+        prompt = f"""Anda adalah Guru AI untuk murid model bahasa pemula (Small Language Model).
+Buat 1 materi pelajaran SUPER SINGKAT (HANYA 1 KALIMAT TUNGGAL, MAKSIMAL 7-10 KATA, sekitar 35-55 karakter) dalam bahasa Indonesia tentang topik: '{target_topic}'.
+Ketentuan Wajib:
+1. 'lesson': HANYA 1 kalimat fakta tunggal ringkas diawali subjek dan berakhiran titik (contoh: '{target_topic} adalah alat untuk mengolah data.'). JANGAN lebih dari 10 kata! JANGAN gunakan anak kalimat majemuk, koma beruntun, atau kata penghubung bertingkat.
+2. 'quiz_question': Kalimat tanya kuis yang menanyakan definisi atau isi dari 'lesson' di atas (contoh: 'Apa itu {target_topic}?' atau 'Apa pengertian {target_topic}?'). Pertanyaan HARUS 100% terjawab oleh kalimat 'lesson'.
+3. 'quiz_prompt': Awalan persis dari kalimat 'lesson' untuk dilanjutkan murid saat menjawab kuis (contoh: '{target_topic} adalah').
+4. 'expected_keywords': 2 sampai 4 kata kunci penting yang ada di dalam 'lesson'.
+Keluarkan output dalam JSON murni persis format ini:
+{{"topic": "{target_topic}", "lesson": "...", "quiz_question": "...", "quiz_prompt": "...", "expected_keywords": ["..."]}}
+HANYA JSON murni tanpa penjelasan markdown."""
         try:
             raw = self._call_ollama(prompt)
             start = raw.find("{")
             end = raw.rfind("}") + 1
             if start >= 0 and end > start:
-                return json.loads(raw[start:end])
+                obj = json.loads(raw[start:end])
+                if 'lesson' in obj and not obj['lesson'].strip().endswith('.'):
+                    obj['lesson'] = obj['lesson'].strip() + '.'
+                if "quiz_question" not in obj:
+                    obj["quiz_question"] = f"Apa yang dimaksud dengan {obj.get('topic', target_topic)}?"
+                if "quiz_prompt" not in obj:
+                    obj["quiz_prompt"] = f"{obj.get('topic', target_topic)} adalah"
+                return obj
         except Exception as e:
             print(f"[Ollama Teacher Warning]: Gagal menghubungi Ollama ({e}). Menggunakan kurikulum bawaan.")
         return self.fallback.get_lesson_and_quiz(turn_idx, topic_hint=topic_hint)
@@ -327,18 +373,28 @@ class OpenAITeacher(BaseTeacher):
 
     def get_lesson_and_quiz(self, turn_idx: int, topic_hint: Optional[str] = None) -> Dict[str, Any]:
         target_topic = topic_hint or f"topik umum ke-{turn_idx} (misal: sains, teknologi, biologi, transportasi, sejarah)"
-        prompt = (
-            f"Anda adalah Guru AI untuk model bahasa pemula. Buat 1 materi pelajaran singkat (2 kalimat) dalam bahasa Indonesia "
-            f"tentang: '{target_topic}'. "
-            f"Keluarkan output dalam JSON murni persis format ini:\n"
-            f'{{"topic": "{target_topic}", "lesson": "materi pelajaran singkat", "quiz_prompt": "kata awal prompt kuis", "expected_keywords": ["kata1", "kata2", "kata3"]}}\n'
-            f"Hanya JSON tanpa teks lain."
-        )
+        prompt = f"""Anda adalah Guru AI untuk murid model bahasa pemula (Small Language Model).
+Buat 1 materi pelajaran SUPER SINGKAT (HANYA 1 KALIMAT TUNGGAL, MAKSIMAL 7-10 KATA, sekitar 35-55 karakter) dalam bahasa Indonesia tentang topik: '{target_topic}'.
+Ketentuan Wajib:
+1. 'lesson': HANYA 1 kalimat fakta tunggal ringkas diawali subjek dan berakhiran titik (contoh: '{target_topic} adalah alat untuk mengolah data.'). JANGAN lebih dari 10 kata! JANGAN gunakan anak kalimat majemuk, koma beruntun, atau kata penghubung bertingkat.
+2. 'quiz_question': Kalimat tanya kuis yang menanyakan definisi atau isi dari 'lesson' di atas (contoh: 'Apa itu {target_topic}?' atau 'Apa pengertian {target_topic}?'). Pertanyaan HARUS 100% terjawab oleh kalimat 'lesson'.
+3. 'quiz_prompt': Awalan persis dari kalimat 'lesson' untuk dilanjutkan murid saat menjawab kuis (contoh: '{target_topic} adalah').
+4. 'expected_keywords': 2 sampai 4 kata kunci penting yang ada di dalam 'lesson'.
+Keluarkan output dalam JSON murni persis format ini:
+{{"topic": "{target_topic}", "lesson": "...", "quiz_question": "...", "quiz_prompt": "...", "expected_keywords": ["..."]}}
+HANYA JSON murni tanpa penjelasan markdown."""
         try:
             raw = self._call_api(prompt)
             start = raw.find("{")
-            if start >= 0:
-                obj, _ = json.JSONDecoder().raw_decode(raw[start:])
+            end = raw.rfind("}") + 1
+            if start >= 0 and end > start:
+                obj = json.loads(raw[start:end])
+                if 'lesson' in obj and not obj['lesson'].strip().endswith('.'):
+                    obj['lesson'] = obj['lesson'].strip() + '.'
+                if "quiz_question" not in obj:
+                    obj["quiz_question"] = f"Apa yang dimaksud dengan {obj.get('topic', target_topic)}?"
+                if "quiz_prompt" not in obj:
+                    obj["quiz_prompt"] = f"{obj.get('topic', target_topic)} adalah"
                 return obj
         except Exception as e:
             print(f"[OpenAI Teacher Warning]: Gagal menghubungi API ({e}). Menggunakan kurikulum bawaan.")
@@ -355,6 +411,15 @@ def parse_args():
                         help="Specific topic/theme for the teacher (e.g. --topic 'Dinosaurus' or --topic 'Robotika')")
     parser.add_argument("--topics", type=str, default=None,
                         help="Comma-separated topics for consecutive turns (e.g. --topics 'Mobil Listrik,Robotika,Planet Mars,Kucing,Kopi')")
+    parser.add_argument("--stage", type=str, default="none",
+                        choices=["none", "bayi", "batita", "balita", "anak", "grow"],
+                        help="Tahap perkembangan kognitif: 'bayi', 'batita', 'balita', 'anak', atau 'grow' (tumbuh bertahap)")
+    parser.add_argument("--sleep", action="store_true", default=True,
+                        help="Aktifkan fase tidur konsolidasi memori (Sleep Replay) di akhir sesi")
+    parser.add_argument("--no-sleep", dest="sleep", action="store_false",
+                        help="Nonaktifkan fase tidur")
+    parser.add_argument("--sleep-steps", type=int, default=5, help="Jumlah siklus konsolidasi memori saat tidur")
+    parser.add_argument("--sleep-lr", type=float, default=5e-4, help="Learning rate saat fase tidur")
     parser.add_argument("--category", type=str, default="all",
                         choices=["all", "transportasi", "teknologi", "sains", "biologi", "kuliner"],
                         help="Pre-defined category pack for offline curriculum teacher (default: 'all')")
@@ -364,10 +429,10 @@ def parse_args():
                         help="Base model checkpoint to teach (defaults to models/hope_id.npz if exists)")
     parser.add_argument("--save-path", type=str, default="models/hope_tutored.npz",
                         help="Path to save the model after tutoring")
-    parser.add_argument("--lr", type=float, default=6e-3, help="Learning rate per turn")
-    parser.add_argument("--learn-steps", type=int, default=8, help="Number of optimization steps per lesson turn")
-    parser.add_argument("--max-quiz-tokens", type=int, default=30, help="Max tokens generated during quiz response")
-    parser.add_argument("--temperature", type=float, default=0.2, help="Sampling temperature during quiz")
+    parser.add_argument("--lr", type=float, default=1.2e-3, help="Learning rate per turn (gentle for stability)")
+    parser.add_argument("--learn-steps", type=int, default=14, help="Number of optimization steps per lesson turn")
+    parser.add_argument("--max-quiz-tokens", type=int, default=65, help="Max tokens generated during quiz response")
+    parser.add_argument("--temperature", type=float, default=0.15, help="Sampling temperature during quiz")
 
     # API options (defaults from .env)
     parser.add_argument("--api-key", type=str, default=os.getenv("OPENAI_API_KEY", ""),
@@ -377,6 +442,22 @@ def parse_args():
     parser.add_argument("--model", type=str, default=os.getenv("LLM_MODEL", "meta-llama/llama-3-8b-instruct:free"),
                         help="Model name for teacher (defaults to LLM_MODEL in .env)")
     return parser.parse_args()
+
+def clean_sentence_output(text: str) -> str:
+    """Trim generated output cleanly at the first terminal punctuation ('.', '!', '?') or newline."""
+    lines = [l.strip() for l in text.split(chr(10)) if l.strip()]
+    if not lines:
+        return ""
+    # Avoid truncating when output begins with a stray leading punctuation mark
+    first_line = lines[0].lstrip(".,!?:; ").strip()
+    if not first_line and len(lines) > 1:
+        first_line = lines[1].lstrip(".,!?:; ").strip()
+
+    candidates = [first_line.find(p) for p in [".", "!", "?"] if first_line.find(p) > 1]
+    if candidates:
+        min_idx = min(candidates)
+        return first_line[:min_idx + 1].strip()
+    return first_line.strip()
 
 def score_response(response: str, expected_keywords: List[str]) -> Tuple[float, int, int]:
     """Calculate keyword recall hit rate."""
@@ -389,43 +470,79 @@ def score_response(response: str, expected_keywords: List[str]) -> Tuple[float, 
     pct = (hits / max(1, total)) * 100.0
     return pct, hits, total
 
+def sleep_consolidation(model, tok, history_records, memory_state, steps=5, lr=5e-4):
+    """Simulate infant night sleep: replay recent memories into slow CMS tiers gently."""
+    if not history_records:
+        return
+    print("\n" + "=" * 78)
+    print("😴 FASE TIDUR & KONSOLIDASI MEMORI (NEURAL REPLAY)...")
+    print("   Otak beristirahat. Hipokampus (Fast Memory M) mentransfer ingatan")
+    print(f"   ke Neokorteks (CMS Tiers) dengan laju belajar sangat halus (lr={lr:.1e}).")
+    print("=" * 78)
+
+    optimizer = nl.NestedOptimizer(model.tier_param_groups(), lr=lr, optimizer_cls=nl.AdamW)
+    loss_fn = nl.CrossEntropyLoss()
+
+    for s in range(steps):
+        losses = []
+        for r in history_records:
+            full_text = f"{r['quiz_prompt']} {r['post_answer']}".strip()
+            if not full_text.endswith("."):
+                full_text += "."
+            study_tokens = tok.encode(full_text + "\n\n")
+            if len(study_tokens) < 3:
+                continue
+            inp = np.array([study_tokens[:-1]], dtype=np.int64)
+            tgt = np.array([study_tokens[1:]], dtype=np.int64)
+
+            optimizer.zero_grad()
+            logits, _ = model.forward(inp, state=memory_state)
+            loss_val = loss_fn.forward(logits, tgt)
+            model.backward(loss_fn.backward())
+            optimizer.step()
+            losses.append(float(loss_val))
+        avg_l = float(np.mean(losses)) if losses else 0.0
+        print(f"  • Siklus Tidur {s+1}/{steps} | Konsolidasi Loss: {avg_l:.4f}")
+    print("✓ Konsolidasi memori selesai! Ingatan baru berhasil mengkristal di Neokorteks.\n")
+
 def save_tutoring_logs(history_records: List[Dict[str, Any]], meta_info: Dict[str, Any]) -> Tuple[str, str]:
-    """Save tutoring session logs in both JSONL and Markdown formats."""
+    """Save tutoring session logs unified into single cumulative files (tutoring_history.jsonl and tutoring_history.md)."""
     log_dir = "logs"
     os.makedirs(log_dir, exist_ok=True)
     session_id = meta_info.get("session_id", "default")
 
-    jsonl_path = os.path.join(log_dir, f"{session_id}.jsonl")
-    md_path = os.path.join(log_dir, f"{session_id}.md")
-    latest_md_path = os.path.join(log_dir, "latest_tutoring.md")
+    jsonl_path = os.path.join(log_dir, "tutoring_history.jsonl")
+    md_path = os.path.join(log_dir, "tutoring_history.md")
 
-    # 1. Write JSONL log (structured per-turn data)
-    with open(jsonl_path, "w", encoding="utf-8") as f:
+    # 1. Append to unified JSONL log
+    with open(jsonl_path, "a", encoding="utf-8") as f:
         for r in history_records:
             entry = {**meta_info, **r}
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    # 2. Write Markdown Report
+    # 2. Append to unified Markdown Report
     avg_pre = float(np.mean([r['pre_score'] for r in history_records]))
     avg_post = float(np.mean([r['post_score'] for r in history_records]))
 
-    md_content = [
-        "# Laporan Sesi Pembelajaran: Guru LLM & Murid HOPE Lite",
-        "",
-        f"- **Session ID:** `{session_id}`",
+    file_exists = os.path.exists(md_path) and os.path.getsize(md_path) > 0
+
+    md_content = []
+    if not file_exists:
+        md_content.append("# 📚 Riwayat Sesi Pembelajaran Guru LLM & Murid HOPE Lite\n")
+
+    md_content.extend([
+        f"## 🎓 Sesi Pembelajaran: `{session_id}`",
         f"- **Waktu Sesi:** {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"- **Guru (Teacher):** {meta_info.get('teacher_desc', 'N/A')}",
         f"- **Model Base Murid:** `{meta_info.get('checkpoint', 'N/A')}`",
         f"- **Total Turn:** {len(history_records)} giliran",
         f"- **Skor Pemahaman:** **{avg_pre:.1f}%** (Sebelum) ──► **{avg_post:.1f}%** (Sesudah Belajar)",
         "",
-        "---",
-        "",
-        "## 📈 Tabel Rangkuman Perkembangan per Turn",
+        "### 📈 Tabel Rangkuman Perkembangan per Turn",
         "",
         "| Turn | Topik Pelajaran | Loss | Memory \\|\\|M\\|\\| | Pre-Test Score | Post-Test Score | Peningkatan |",
         "|---|---|---|---|---|---|---|",
-    ]
+    ])
 
     for r in history_records:
         delta = r['post_score'] - r['pre_score']
@@ -436,18 +553,17 @@ def save_tutoring_logs(history_records: List[Dict[str, Any]], meta_info: Dict[st
 
     md_content.extend([
         "",
-        "---",
-        "",
-        "## 📝 Rincian Dialog Pembelajaran per Turn",
+        "### 📝 Rincian Dialog Pembelajaran",
         "",
     ])
 
     for r in history_records:
         md_content.extend([
-            f"### Turn {r['turn']}: {r['topic']}",
+            f"#### Turn {r['turn']}: {r['topic']}",
             f"- **Materi Guru:**",
             f"  > *\"{r.get('lesson', '')}\"*",
-            f"- **Kuis Evaluasi:** `{r.get('quiz_prompt', '')}`",
+            f"- **Pertanyaan Kuis Guru:** `{r.get('quiz_question', r.get('quiz_prompt', ''))}`",
+            f"- **Prompt Evaluasi Murid:** `{r.get('quiz_prompt', '')}`",
             f"- **Jawaban Murid Sebelum Belajar:**",
             f"  > `{r['pre_answer']}` *(Recall: {r['pre_score']:.0f}%)*",
             f"- **Jawaban Murid Sesudah Belajar:**",
@@ -458,11 +574,10 @@ def save_tutoring_logs(history_records: List[Dict[str, Any]], meta_info: Dict[st
             "",
         ])
 
-    full_md = "\n".join(md_content)
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(full_md)
-    with open(latest_md_path, "w", encoding="utf-8") as f:
-        f.write(full_md)
+    md_content.append("\n---\n")
+
+    with open(md_path, "a", encoding="utf-8") as f:
+        f.write("\n".join(md_content) + "\n")
 
     return jsonl_path, md_path
 
@@ -493,18 +608,24 @@ def main():
     if args.materi_file:
         teacher_desc = f"Kurikulum dari Berkas '{os.path.basename(args.materi_file)}' (Offline)"
     if teacher_type == "curriculum":
-        teacher = CurriculumTeacher(category=args.category, custom_file=args.materi_file)
+        if args.stage != "none":
+            teacher_desc = f"Kurikulum Tumbuh Kembang Kognitif (Tahap: {args.stage.upper()})"
+        teacher = CurriculumTeacher(category=args.category, custom_file=args.materi_file, stage=args.stage)
         print(f"Guru (Teacher): {teacher_desc}")
     elif teacher_type == "ollama":
         teacher = OllamaTeacher(model=args.model)
+        teacher.stage = args.stage
         teacher_desc = f"Ollama Lokal ({args.model})"
         print(f"Guru (Teacher): {teacher_desc}")
     elif teacher_type == "openai":
         teacher = OpenAITeacher(api_key=api_key, base_url=args.base_url, model=args.model)
+        teacher.stage = args.stage
         provider_name = "OpenRouter / 9router" if "openrouter" in args.base_url.lower() or "9router" in args.base_url.lower() else "OpenAI API"
         teacher_desc = f"{provider_name} ({args.model})"
         print(f"Guru (Teacher): {teacher_desc} (URL: {args.base_url})")
     ckpt_path = args.checkpoint
+    if args.stage != "none" and args.checkpoint == "models/hope_id.npz" and os.path.exists("models/hope_infant.npz"):
+        ckpt_path = "models/hope_infant.npz"
     if not os.path.exists(ckpt_path) and os.path.exists(os.path.join("models", ckpt_path)):
         ckpt_path = os.path.join("models", ckpt_path)
     elif not os.path.exists(ckpt_path) and os.path.exists("models/hope_model.npz"):
@@ -543,9 +664,18 @@ def main():
         topic_hint = turn_topics[(turn - 1) % len(turn_topics)] if turn_topics else None
         item = teacher.get_lesson_and_quiz(turn, topic_hint=topic_hint)
         topic = item.get("topic", f"Pelajaran {turn}")
-        lesson_text = item.get("lesson", "")
-        quiz_prompt = item.get("quiz_prompt", "")
+        lesson_text = item.get("lesson", "").strip()
+        quiz_question = item.get("quiz_question") or f"Apa yang dimaksud dengan {topic}?"
+        quiz_prompt = item.get("quiz_prompt") or f"{topic} adalah"
         expected_keywords = item.get("expected_keywords", [])
+
+        # Pastikan awalan materi selaras dengan quiz_prompt agar murid bisa mengingat dengan tepat
+        clean_prompt = quiz_prompt.strip()
+        if not lesson_text.lower().startswith(clean_prompt.lower()):
+            study_text = f"{clean_prompt} {lesson_text}\n\n"
+        else:
+            study_text = lesson_text + "\n\n"
+
         print(f"\n┌────────────────────────────────────────────────────────────────────────┐")
         print(f"│ 📚 TURN {turn}/{args.turns}: {topic:<58} │")
         print(f"├────────────────────────────────────────────────────────────────────────┤")
@@ -557,10 +687,13 @@ def main():
             max_new_tokens=args.max_quiz_tokens,
             temperature=args.temperature,
             top_k=20,
-            state=memory_state,
+            repetition_penalty=1.25,
+            state=None,  # Pre-test murni menguji memori jangka panjang tanpa polusi working memory turn sebelumnya
         )
-        pre_answer = tok.decode(pre_gen_ids)[len(quiz_prompt):].strip()
-        pre_score, pre_hits, total_kw = score_response(pre_answer, expected_keywords)
+        raw_pre = tok.decode(pre_gen_ids[len(pre_quiz_tokens):]).strip()
+        pre_answer = clean_sentence_output(raw_pre)
+        full_pre = f"{quiz_prompt} {pre_answer}".strip()
+        pre_score, pre_hits, total_kw = score_response(full_pre, expected_keywords)
 
         # --- B. Murid Aktif Tanya Balik jika Belum Tahu ---
         is_unknown = pre_score < 40.0
@@ -576,53 +709,76 @@ def main():
             print(f"│ 🧑‍🏫 GURU MEMPERDALAM MATERI:")
             print(f"│   \"{lesson_text}\"")
 
-        # --- C. Murid Belajar & Menyerap Materi (In-Chat Learning & Memory Update) ---
-        lesson_tokens = tok.encode(lesson_text)
-        inp = np.array([lesson_tokens[:-1]], dtype=np.int64)
-        tgt = np.array([lesson_tokens[1:]], dtype=np.int64)
+        # --- C. Pertanyaan Kuis dari Guru ---
+        print(f"│")
+        print(f"│ 🧑‍🏫 PERTANYAAN KUIS DARI GURU:")
+        print(f"│   \"{quiz_question}\"")
+        print(f"│   (Prompt Evaluasi Murid: \"{quiz_prompt}\")")
 
-        # 1. Update Fast-Weight Memory via Delta Rule (in-context absorption)
-        _, memory_state = model.forward(inp, state=memory_state)
+        # --- D. Murid Belajar & Menyerap Materi (In-Chat Learning & Memory Update) ---
+        study_tokens = tok.encode(study_text)
+        inp = np.array([study_tokens[:-1]], dtype=np.int64)
+        tgt = np.array([study_tokens[1:]], dtype=np.int64)
+
+        # Segarkan optimizer per turn agar momentum gradien materi lama tidak membiaskan materi baru
+        turn_optimizer = nl.NestedOptimizer(model.tier_param_groups(), lr=args.lr, optimizer_cls=nl.AdamW)
+
+        # 1. Update Fast-Weight Memory via Delta Rule (fokus memori kerja pada materi saat ini)
+        _, memory_state = model.forward(inp, state=None)
         mem_norm = float(np.linalg.norm(memory_state[0]))
 
         # 2. Update Slow Weights via Analytical Gradient Descent
         turn_loss = 0.0
-        for _ in range(args.learn_steps):
-            optimizer.zero_grad()
+        max_steps = args.learn_steps
+        for s in range(max_steps):
+            turn_optimizer.zero_grad()
             logits, _ = model.forward(inp, state=memory_state)
             loss_val = loss_fn.forward(logits, tgt)
             dlogits = loss_fn.backward()
             model.backward(dlogits)
-            optimizer.step()
+            turn_optimizer.step()
             turn_loss = float(loss_val)
+            if turn_loss < 0.15:
+                break
 
-        # 3. Otomatis Simpan Jawaban Guru ke Dataset JSONL (Auto-Saved Teacher QA)
-        os.makedirs("data", exist_ok=True)
-        qa_record = {
-            "turn": turn,
-            "topic": topic,
-            "student_question": inquiry,
-            "teacher_answer": lesson_text,
-            "quiz_prompt": quiz_prompt,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        with open("data/learned_teacher_qa.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps(qa_record, ensure_ascii=False) + "\n")
-
-        # --- D. Murid Menguji Kuis SETELAH Belajar (Post-Test) ---
+        # --- E. Murid Menguji Kuis SETELAH Belajar (Post-Test) ---
         post_quiz_tokens = tok.encode(quiz_prompt)
         post_gen_ids = model.generate(
             post_quiz_tokens,
             max_new_tokens=args.max_quiz_tokens,
             temperature=args.temperature,
             top_k=20,
+            repetition_penalty=1.25,
             state=memory_state,
         )
-        post_answer = tok.decode(post_gen_ids)[len(quiz_prompt):].strip()
-        post_score, post_hits, total_kw = score_response(post_answer, expected_keywords)
+        raw_post = tok.decode(post_gen_ids[len(post_quiz_tokens):]).strip()
+        post_answer = clean_sentence_output(raw_post)
+        full_post = f"{quiz_prompt} {post_answer}".strip()
+        post_score, post_hits, total_kw = score_response(full_post, expected_keywords)
+
+        # 3. Otomatis Simpan HANYA JIKA Murid Berhasil Mengingat (Recall >= 40%)
+        if post_score >= 40.0:
+            os.makedirs("data", exist_ok=True)
+            qa_record = {
+                "turn": turn,
+                "topic": topic,
+                "student_question": inquiry,
+                "teacher_answer": lesson_text,
+                "quiz_question": quiz_question,
+                "quiz_prompt": quiz_prompt,
+                "student_answer": full_post,
+                "recall_score": post_score,
+                "mastered": True,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            with open("data/learned_teacher_qa.jsonl", "a", encoding="utf-8") as f:
+                f.write(json.dumps(qa_record, ensure_ascii=False) + "\n")
+            saved_status = f"Disimpan ke 'data/learned_teacher_qa.jsonl' (Lulus: {post_score:.0f}%)"
+        else:
+            saved_status = f"Dilewati (Recall {post_score:.0f}% < 40%, belum dikuasai murid)"
 
         print(f"│")
-        print(f"│ 🤖 RESPON MURID (HOPE LITE):")
+        print(f"│ 🤖 RESPON JAWABAN MURID (HOPE LITE):")
         print(f"│   Sebelum Belajar : \"{quiz_prompt} {pre_answer}\" (Recall: {pre_hits}/{total_kw} kata kunci)")
         print(f"│   Sesudah Belajar : \"{quiz_prompt} {post_answer}\" (Recall: {post_hits}/{total_kw} kata kunci)")
         print(f"│")
@@ -630,13 +786,14 @@ def main():
         print(f"│   • Loss Pelajaran : {turn_loss:.4f} (Perplexity: {np.exp(min(15.0, turn_loss)):.2f})")
         print(f"│   • Memory M Norm  : {mem_norm:.4f}")
         print(f"│   • Skor Pemahaman : {post_score:.1f}% ({post_hits}/{total_kw} kata kunci cocok)")
-        print(f"│   • Auto-Saved     : 'data/learned_teacher_qa.jsonl'")
+        print(f"│   • Auto-Saved     : {saved_status}")
         print(f"└────────────────────────────────────────────────────────────────────────┘")
 
         history_records.append({
             "turn": turn,
             "topic": topic,
             "lesson": lesson_text,
+            "quiz_question": quiz_question,
             "quiz_prompt": quiz_prompt,
             "expected_keywords": expected_keywords,
             "loss": turn_loss,
@@ -646,6 +803,10 @@ def main():
             "pre_answer": f"{quiz_prompt} {pre_answer}",
             "post_answer": f"{quiz_prompt} {post_answer}",
         })
+
+    # Optional sleep consolidation phase
+    if getattr(args, "sleep", True) and len(history_records) > 0:
+        sleep_consolidation(model, tok, history_records, memory_state, steps=args.sleep_steps, lr=args.sleep_lr)
 
     # Save tutored model
     save_path = args.save_path
@@ -692,7 +853,6 @@ def main():
     print(f"  • JSONL Log  : {jsonl_log}")
     print(f"  • Markdown   : {md_log}")
     print(f"  • SQLite DB  : data/memory.db (Session: '{session_id}' & 'latest_tutoring')")
-    print(f"  • Ringkasan  : logs/latest_tutoring.md")
     print("\n" + "=" * 78)
     print("📈 REKAP PERKEMBANGAN PEMAHAMAN MURID (HOPE LITE) PER TURN CHAT:")
     print("=" * 78)
