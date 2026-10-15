@@ -30,8 +30,11 @@ Versi **Lite** ini dibuat sebagai studi kasus / eksplorasi agar:
 - ✅ **100% Bebas PyTorch / CUDA:** Hanya menggunakan Python standar dan NumPy.
 - ✅ **Sangat Ringan & Portabel:** Berjalan mulus di laptop standar, Raspberry Pi, VPS spek rendah, atau CPU apa pun tanpa instalasi gigabyte dependencies.
 - ✅ **Backpropagation Analitis Lengkap:** Turunan eksak (*closed-form exact analytical backward*) untuk semua layer, termasuk BPTT (Backpropagation Through Time) pada *gated delta rule* memori dinamis.
-- ✅ **Inferensi $O(1)$ per Token ($O(N)$ Total):** Menggunakan *state-passing* autoregressive inference dengan kecepatan **>800–1300 tokens/detik di CPU**.
+- ✅ **Inferensi $O(1)$ per Token ($O(N)$ Total):** Menggunakan *state-passing* autoregressive inference dengan kecepatan **>800–1400 tokens/detik di CPU**.
 - ✅ **Mitigasi Catastrophic Forgetting:** Dilengkapi sistem *Continuum Memory System (CMS)* multi-tier yang terbukti menahan degradasi performa pada tugas sebelumnya.
+- ✅ **🎓 LLM-as-a-Teacher Continual Tutoring:** Bimbingan interaktif bertahap dengan tahapan kognitif (*bayi, batita, balita, anak, grow*) dan fase tidur konsolidasi memori (*neural replay*).
+- ✅ **🔄 Text Data Augmentation (Padanan YOLO untuk NLP):** Augmentasi variasi struktur kalimat, substitusi sinonim, dan *modifier jittering* di berkas terpisah (`nested_learning/augmentation.py`) agar representasi konsep kokoh dan tidak tertukar.
+- ✅ **💬 In-Chat Continual Learning (`/learn`):** Mengajarkan fakta baru secara langsung di konsol obrolan dengan *micro-training* adaptif dan otomatis tersimpan permanen ke disk (.npz).
 
 ---
 
@@ -99,11 +102,11 @@ $$o_t = q_t M_{t-1} \quad \text{(read-out sebelum menulis)}$$
 
 ### 2. Slow Weights: Continuum Memory System (CMS) & Deep Optimizer
 Lapisan Feed-Forward Network (FFN) dipartisi ke dalam tier frekuensi yang diperbarui oleh *Deep Optimizer* pada kecepatan berbeda:
-- **Tier 0 (Fast, Period = 1):** Diperbarui setiap langkah pelatihan untuk menangkap konteks dan adaptasi cepat.
+- **Tier 0 (Fast, Period = 1):** Diperbarui setiap langkah pelatihan untuk adaptasi konteks cepat.
 - **Tier 1 (Medium, Period = 4):** Mengakumulasi dan merata-ratakan gradien selama 4 langkah sebelum melangkah.
 - **Tier 2 (Slow, Period = 16):** Mengakumulasi gradien selama 16 langkah untuk konsolidasi struktur jangka panjang.
 
-Mekanisme multi-frekuensi ini meniru osilasi gelombang otak manusia (gelombang gamma cepat untuk perhatian sesaat, gelombang delta/theta lambat untuk konsolidasi memori permanen saat tidur).
+Mekanisme multi-frekuensi ini meniru osilasi gelombang otak manusia: ritme cepat untuk atensi sesaat, dan ritme lambat untuk konsolidasi memori permanen saat tidur.
 
 ---
 
@@ -112,7 +115,8 @@ Mekanisme multi-frekuensi ini meniru osilasi gelombang otak manusia (gelombang g
 ```
 nested-learning/
 ├── nested_learning/               # Core Package (Pure NumPy)
-│   ├── __init__.py                # Public API
+│   ├── __init__.py                # Public API & ekspor modul
+│   ├── augmentation.py            # Text Data Augmentation (NLP YOLO Analog: rephrase, sinonim, jitter)
 │   ├── layers.py                  # Linear, LayerNorm, GELU, Embedding, SelfModifyingLayer, CMS
 │   ├── model.py                   # HOPE architecture, state-passing generation, NPZ checkpointing
 │   ├── optimizers.py              # AdamW, SGD, NestedOptimizer (Deep Optimizer), CosineAnnealingLR
@@ -122,20 +126,31 @@ nested-learning/
 │   └── trainer.py                 # TextDataset & Trainer dengan multi-tier scheduling
 │
 ├── data/                          # Folder Penyimpanan Data & Database
-│   ├── memory.db                  # Database SQLite penyimpan Fast-Weight Memory per user
+│   ├── memory.db                  # Database SQLite penyimpan Fast-Weight Memory per user/sesi
+│   ├── developmental_qa.jsonl     # Kurikulum tumbuh kembang (bayi, batita, balita, anak)
+│   ├── learned_teacher_qa.jsonl   # Bank fakta yang tuntas dikuasai murid saat bimbingan guru
+│   ├── user_learned_qa.jsonl      # Bank fakta baru yang diajarkan pengguna lewat konsol chat (/learn)
+│   ├── infant_corpus.txt          # Korpus dasar kata & kalimat tahap bayi
 │   ├── fakta_transportasi.txt     # Kamus fakta transportasi darat, laut, dan udara
 │   ├── id_foundation_corpus.txt   # Korpus fondasi bahasa Indonesia (sains, geografi, AI)
-│   ├── id_instruction_qa.jsonl    # Dataset instruksi & tanya-jawab format JSONL
-│   └── wikipedia_id_articles.txt  # Artikel ensiklopedia resmi Wikipedia Indonesia
+│   └── id_instruction_qa.jsonl    # Dataset instruksi & tanya-jawab format JSONL
 │
 ├── models/                        # Folder Penyimpanan Model Checkpoint (.npz)
-│   ├── hope_model.npz             # Model checkpoint hasil pelatihan demo
-│   └── hope_id.npz                # Model checkpoint hasil pelatihan bahasa Indonesia
+│   ├── hope_tutored.npz           # Model hasil bimbingan guru interaktif (siap chat)
+│   ├── hope_infant.npz            # Model fondasi tahap bayi (infant)
+│   ├── hope_id.npz                # Model fondasi bahasa Indonesia umum
+│   └── hope_model.npz             # Model checkpoint demo
 │
-├── scripts/                       # Skrip Pendukung & Eksperimen
-│   ├── download_datasets.py       # Pengunduh dataset MediaWiki Wikipedia ID (zero dependency)
+├── scripts/                       # Skrip Pelatihan & Eksperimen
+│   ├── llm_teacher_train.py       # Pelatihan interaktif LLM-as-a-Teacher (offline & online API)
 │   ├── train_demo.py              # Skrip demo latihan cepat (~4 detik di CPU)
-│   └── demo_continual_learning.py # Benchmark mitigasi Catastrophic Forgetting
+│   ├── demo_continual_learning.py # Benchmark mitigasi Catastrophic Forgetting
+│   └── download_datasets.py       # Pengunduh dataset MediaWiki Wikipedia ID (zero dependency)
+│
+├── logs/                          # Riwayat Sesi & Evaluasi Belajar
+│   ├── tutoring_history.jsonl     # Rekap metrik turn bimbingan guru format JSONL
+│   ├── tutoring_history.md        # Laporan visual tabel kemajuan kognitif murid
+│   └── in_chat_learning.log       # Log pembelajaran on-the-fly dari konsol chat
 │
 ├── tests/                         # Behavioral & Mathematical Verification
 │   ├── test_equivalence.py        # O(N) state-passing == full sequence forward equivalence
@@ -144,10 +159,10 @@ nested-learning/
 │   ├── test_gradients.py          # Uji gradien numerik (finite differences) seluruh layer
 │   └── run_all_tests.py           # Master runner seluruh test suite
 │
-├── docs/                          # Dokumentasi Lengkap & Riwayat Sesi
+├── docs/                          # Dokumentasi Lengkap & Riwayat Riset
 ├── train.py                       # CLI Utama: Pelatihan fleksibel dataset kustom
 ├── generate.py                    # CLI Utama: Generasi teks autoregresif O(N)
-├── chat.py                        # CLI Utama: Konsol chat interaktif + multi-session SQLite
+├── chat.py                        # CLI Utama: Konsol chat interaktif + in-chat learning
 ├── requirements.txt               # numpy>=1.22.0
 ├── pyproject.toml                 # Package configuration
 └── README.md                      # Dokumentasi teknis
@@ -212,20 +227,77 @@ Output:
 Generated 50 tokens in 0.045s (1110.2 tokens/sec on CPU)
 ```
 
-### 6. Chat Interaktif & Inspeksi Matriks Memori
-Jalankan sesi konsol interaktif:
+### 6. Chat Interaktif & In-Chat Learning (`/learn`)
+Jalankan sesi konsol interaktif dengan model hasil bimbingan:
 ```bash
-python chat.py
+python chat.py --model models/hope_tutored.npz
 ```
-Perintah khusus dalam chat:
-- Masukkan teks biasa untuk bercakap dengan model.
-- `/memory` : Memeriksa statistik matriks memori dinamis $M$ (Frobenius norm, rata-rata, nilai maks, sparsity, dan preview sub-matriks).
-- `/reset` : Mengosongkan memori dinamis ke nol.
-- `/temp <val>` : Mengubah temperatur sampling secara dinamis (misal `/temp 0.5`).
-- `/tokens <n>` : Mengubah panjang token balasan (misal `/tokens 60`).
-- `quit` atau `exit` : Keluar dari sesi.
 
-### 7. Melatih Dataset Kustom Anda Sendiri
+Fitur & Perintah Khusus Konsol Chat:
+- **Tanya Jawab Bebas**: Tanyakan fakta secara langsung kepada model.
+- `/learn <kalimat fakta>`: **Mengajarkan fakta baru secara instan di dalam chat!**
+  - Model akan membuat 3 variasi kalimat otomatis via augmentasi teks.
+  - Melakukan *micro-training* adaptif beberapa langkah hingga konvergen (Loss $\le 0.10$).
+  - **Otomatis menyimpan perubahan bobot secara permanen ke file `.npz` di disk**, sehingga pengetahuan baru tetap diingat meski program chat ditutup dan dibuka kembali.
+- `/memory` : Memeriksa statistik matriks memori dinamis $M$ (Frobenius norm, rata-rata, nilai maks, sparsity, dan preview sub-matriks).
+- `/reset` : Mengosongkan memori dinamis ke nol (sekaligus menghapus riwayat sesi di SQLite).
+- `/temp <val>` : Mengubah temperatur sampling secara dinamis (misal `/temp 0.4` untuk jawaban lebih presisi).
+- `/tokens <n>` : Mengubah panjang maksimum token balasan (misal `/tokens 30`).
+- `quit` atau `exit` : Keluar dari sesi chat.
+
+> [!TIP]
+> **Anti-Halusinasi & Stop Condition**: Mesin inferensi `chat.py` telah dilengkapi *early stop* otomatis saat model menghasilkan tanda titik (`.`), tanda seru (`!`), tanda tanya (`?`), atau *newline* (`\n`), sehingga model menjawab dengan padat dan tidak berhalusinasi melantur.
+
+---
+
+### 7. Pelatihan Kognitif LLM-as-a-Teacher (Tahapan Bayi s/d Anak)
+Latih model layaknya mendidik seorang anak kecil melalui skrip bimbingan kurikulum bertahap:
+```bash
+# Melatih tahap bayi (4 giliran bimbingan, kurikulum offline)
+python scripts/llm_teacher_train.py --stage bayi --turns 4 --teacher curriculum
+
+# Melanjutkan bimbingan pada checkpoint yang ada (tanpa mereset pengetahuan lama)
+python scripts/llm_teacher_train.py --stage batita --turns 4 --teacher curriculum --resume
+
+# Menggunakan LLM online (OpenAI / OpenRouter / Anthropic) sebagai guru jika ada API key
+python scripts/llm_teacher_train.py --stage bayi --teacher openai --api-key YOUR_API_KEY
+```
+
+Tahapan Kognitif yang Didukung:
+- `bayi`: Pengenalan kata tunggal, tubuh, dan fungsi dasar (`mata`, `kaki`, `tidur`).
+- `batita`: Kalimat 2-3 kata, lingkungan sekitar, dan objek (`kucing mengeong`, `bola bulat`).
+- `balita`: Kalimat tanya sebab-akibat sederhana (`kenapa burung terbang?`).
+- `anak`: Penalaran logis dasar, moral, dan fakta dunia.
+- `grow`: Melatih seluruh tahapan secara berurutan (*full developmental journey*).
+
+> [!IMPORTANT]
+> **Konsolidasi Tidur (*Sleep Consolidation*) & Interleaved Replay:**
+> Setelah sesi tanya-jawab dengan guru selesai, model memasuki fase "tidur". Seluruh materi yang baru dipelajari dan bank pengetahuan lama (`data/learned_teacher_qa.jsonl`) di-replay secara silang (*contrastive interleaved replay*) dengan variasi teks otomatis hingga loss $\le 0.08$. Hal ini mencegah kebingungan representasi pada kata penghubung yang sama (misalnya `telinga untuk...` vs `hidung untuk...`).
+
+---
+
+### 8. Augmentasi Teks Otomatis (NLP YOLO Analog)
+Modul mandiri [nested_learning/augmentation.py](file:///var/www/projects/nested-learning/nested_learning/augmentation.py) menerapkan konsep augmentasi data gambar (seperti flip, rotasi, dan jitter pada YOLO) ke dalam ranah pemrosesan bahasa alami:
+- **Struktur Pembalikan & Template**: `A untuk B` $\rightarrow$ `fungsi A adalah B`, `guna A ialah B`, `A berfungsi sebagai B`.
+- **Substitusi Sinonim**: Mengganti kata kunci dengan padanan alami bahasa Indonesia tanpa mengubah esensi makna.
+- **Modifier Jittering**: Menambahkan kata penegas lembut secara acak (*pasti*, *sungguh*, *selalu*, dsb.).
+
+Uji coba mandiri augmentasi teks:
+```python
+import nested_learning as nl
+
+variations = nl.augment_text("kaki untuk berjalan", n_variants=3)
+for v in variations:
+    print("-", v)
+# Output:
+# - fungsi dari kaki adalah untuk berjalan
+# - guna kaki adalah untuk melangkah
+# - tentu saja kaki berguna untuk berjalan
+```
+
+---
+
+### 9. Melatih Dataset Kustom Anda Sendiri
 Gunakan skrip serbaguna `train.py` untuk melatih model pada dataset Anda:
 ```bash
 # Melatih dari file teks (.txt / .md)
@@ -236,6 +308,7 @@ python train.py --data data/contoh_qa.jsonl --data-type qa --epochs 8 --save-pat
 ```
 Panduan mendalam cara membuat format data, pembagian train/val split, dan fine-tuning lanjutan tersedia di **[docs/DATASET_GUIDE.md](./docs/DATASET_GUIDE.md)**.
 Dokumentasi lengkap penjelasan arsitektur, pemrosesan data, dan bedah seluruh kode package `nested_learning` tersedia di **[docs/BEDAH_KODE_DAN_ARSITEKTUR.md](./docs/BEDAH_KODE_DAN_ARSITEKTUR.md)**.
+
 ---
 
 ## 💻 Contoh Penggunaan API Python
@@ -247,7 +320,11 @@ import nested_learning as nl
 # 1. Inisialisasi Tokenizer (ByteTokenizer melingkupi 100% UTF-8 tanpa token <unk>)
 tok = nl.ByteTokenizer()
 
-# 2. Definisikan Model HOPE
+# 2. Augmentasi Teks Otomatis
+variasi = nl.augment_text("mata untuk melihat", n_variants=3)
+print("Variasi kalimat:", variasi)
+
+# 3. Definisikan Model HOPE
 # cms_tiers: 2 layer cepat (period 1), 2 layer lambat (period 4)
 model = nl.HOPE(
     vocab_size=tok.vocab_size,
@@ -256,7 +333,7 @@ model = nl.HOPE(
     cms_tiers=[[2, 1], [2, 4]],
 )
 
-# 3. Setup Nested Deep Optimizer & Loss
+# 4. Setup Nested Deep Optimizer & Loss
 loss_fn = nl.CrossEntropyLoss(ignore_index=tok.pad_token_id)
 optimizer = nl.NestedOptimizer(
     model.tier_param_groups(),
@@ -264,7 +341,7 @@ optimizer = nl.NestedOptimizer(
     optimizer_cls=nl.AdamW,
 )
 
-# 4. Pelatihan 1 Step
+# 5. Pelatihan 1 Step
 x_tokens = np.array([[10, 20, 30, 40]], dtype=np.int64)
 y_targets = np.array([[20, 30, 40, 50]], dtype=np.int64)
 
@@ -277,12 +354,12 @@ tier_updates = optimizer.step()
 
 print(f"Loss: {loss:.4f} | Tier updates: {tier_updates}")
 
-# 5. Generasi Autoregresif O(N)
-prompt = tok.encode("Nested Learning")
+# 6. Generasi Autoregresif O(N)
+prompt = tok.encode("kaki untuk")
 generated = model.generate(prompt, max_new_tokens=30, temperature=0.7)
 print("Output:", tok.decode(generated))
 
-# 6. Simpan & Muat Checkpoint
+# 7. Simpan & Muat Checkpoint
 model.save_checkpoint("model_saya.npz", extra_meta={"version": 1})
 loaded_model, meta = nl.HOPE.load_checkpoint("model_saya.npz")
 ```

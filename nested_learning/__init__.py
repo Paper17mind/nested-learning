@@ -36,6 +36,7 @@ from nested_learning.tokenizer import (
 )
 from nested_learning.memory_store import SQLiteMemoryStore, memory_to_vector
 from nested_learning.trainer import QADataset, TextDataset, Trainer
+from nested_learning.augmentation import TextAugmenter, augment_text
 __all__ = [
     "Parameter",
     "Module",
@@ -64,6 +65,8 @@ __all__ = [
     "Trainer",
     "SQLiteMemoryStore",
     "memory_to_vector",
+    "TextAugmenter",
+    "augment_text",
 ]
 
 __version__ = "0.1.0"

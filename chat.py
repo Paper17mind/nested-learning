@@ -108,7 +108,17 @@ def main():
         saved_db = db_store.load_memory(current_session)
         if saved_db is not None:
             db_state, db_meta = saved_db
-            if db_state.shape[-1] == model.d_model and db_state.shape[-2] == model.d_model:
+            ckpt_mtime = os.path.getmtime(ckpt_path) if os.path.exists(ckpt_path) else 0
+            db_updated = db_meta.get("updated_at", 0) if isinstance(db_meta, dict) else 0
+            db_ckpt = db_meta.get("checkpoint") if isinstance(db_meta, dict) else None
+            # If checkpoint was updated after this session was saved, or session was for different checkpoint, start fresh
+            if db_ckpt and os.path.abspath(db_ckpt) != os.path.abspath(ckpt_path):
+                print(f"[SQLite]: Stored session '{current_session}' was for '{db_ckpt}' (not '{ckpt_path}'). Starting fresh memory.")
+                state = None
+            elif db_updated and ckpt_mtime > db_updated:
+                print(f"[SQLite]: Checkpoint '{ckpt_path}' was modified after session '{current_session}' was saved. Starting fresh memory.")
+                state = None
+            elif db_state.shape[-1] == model.d_model and db_state.shape[-2] == model.d_model:
                 state = db_state
                 print(f"[SQLite]: Restored active memory for session '{current_session}' from data/memory.db (norm: {float(np.linalg.norm(state[0])):.3f})")
             else:
@@ -203,22 +213,44 @@ def main():
                 if not learn_text:
                     print("Usage: /learn <text to memorize>")
                     continue
+                if not learn_text.endswith((".", "!", "?")):
+                    learn_text += "."
                 learn_tokens = tok.encode(learn_text)
                 if len(learn_tokens) < 3:
                     print("Text too short to train (minimum 3 characters).")
                     continue
-                inp = np.array([learn_tokens[:-1]], dtype=np.int64)
-                tgt = np.array([learn_tokens[1:]], dtype=np.int64)
-                optimizer.zero_grad()
-                logits, _ = model.forward(inp)
-                loss = loss_fn.forward(logits, tgt)
-                model.backward(loss_fn.backward())
-                optimizer.step()
-                print(f"[Learned]: Updated model weights on '{learn_text}' (Loss: {loss:.4f})")
+                # Micro-training adaptif dengan augmentasi variasi otomatis (analog dengan rotasi/flip)
+                variants = nl.augment_text(learn_text, max_variations=3)
+                fast_opt = nl.NestedOptimizer(model.tier_param_groups(), lr=5e-3, optimizer_cls=nl.AdamW)
+                final_loss = 0.0
+                steps_taken = 0
+                for step in range(20):
+                    step_losses = []
+                    for v_text in variants:
+                        v_toks = tok.encode(v_text)
+                        if len(v_toks) < 3:
+                            continue
+                        inp_v = np.array([v_toks[:-1]], dtype=np.int64)
+                        tgt_v = np.array([v_toks[1:]], dtype=np.int64)
+                        fast_opt.zero_grad()
+                        logits, state = model.forward(inp_v, state=state)
+                        loss_v = loss_fn.forward(logits, tgt_v)
+                        model.backward(loss_fn.backward())
+                        fast_opt.step()
+                        step_losses.append(float(loss_v))
+                    final_loss = float(np.mean(step_losses)) if step_losses else 0.0
+                    steps_taken = step + 1
+                    if final_loss < 0.10:
+                        break
+
+                # Otomatis simpan bobot model ke berkas checkpoint agar permanen saat keluar chat
+                model.save_checkpoint(current_checkpoint, memory_state=state, extra_meta={"note": "in_chat_learned"})
+                print(f"[Learned]: Berhasil mempelajari '{learn_text}' (Loss: {final_loss:.4f} dlm {steps_taken} langkah)")
+                print(f"[Auto-Saved]: Bobot baru tersimpan permanen ke '{current_checkpoint}'.")
                 log_dir = "logs"
                 os.makedirs(log_dir, exist_ok=True)
                 with open(os.path.join(log_dir, "in_chat_learning.log"), "a", encoding="utf-8") as f:
-                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] session={current_session} loss={loss:.4f} text='{learn_text}'\n")
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] session={current_session} steps={steps_taken} loss={final_loss:.4f} text='{learn_text}'\n")
                 continue
             elif cmd == "/reset":
                 state = None
@@ -287,6 +319,9 @@ def main():
                 }
                 with open("data/user_learned_qa.jsonl", "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+                # Auto-save model weights ke file checkpoint
+                model.save_checkpoint(current_checkpoint, memory_state=state, extra_meta={"note": "auto_learned"})
 
                 # Auto-save ke database SQLite
                 if state is not None:
@@ -363,9 +398,12 @@ def main():
 
             gen_tokens.append(next_tok)
 
-            if next_tok == tok.eos_token_id:
+            if next_tok == tok.eos_token_id or next_tok == 10:
                 break
-            if len(gen_tokens) > 5:
+            char = tok.decode([next_tok])
+            if len(gen_tokens) >= 5 and char in (".", "!", "?"):
+                break
+            if len(gen_tokens) >= 3:
                 tail = tok.decode(gen_tokens[-8:])
                 if "\n" in tail or "\nPertanyaan:" in tail:
                     break
@@ -377,12 +415,8 @@ def main():
 
         t1 = time.time()
         raw_reply = tok.decode(gen_tokens)
-        if is_question:
-            # Ambil jawaban pertama sebelum baris baru
-            first_line = raw_reply.split("\n")[0].strip()
-            reply_text = first_line if first_line else raw_reply.strip()
-        else:
-            reply_text = raw_reply.strip()
+        first_line = raw_reply.split("\n")[0].strip()
+        reply_text = first_line if first_line else raw_reply.strip()
         speed = len(gen_tokens) / max(1e-4, t1 - t0)
 
         # 3. Deteksi Ketidaktahuan: Jika user bertanya dan model ragu / meracau (degeneration)
@@ -427,6 +461,8 @@ def main():
                     "checkpoint": current_checkpoint,
                 },
             )
+            # Redam memori kerja antar-giliran agar tidak membiaskan/meracau ke pertanyaan berikutnya
+            state = state * 0.70
 
 if __name__ == "__main__":
     main()
