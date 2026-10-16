@@ -129,6 +129,21 @@ def main():
     auto_learn_enabled = getattr(args, "autolearn", True)
     pending_question = None
     last_learned_record = None
+
+    # Track learned facts for cross-fact compositional reasoning
+    session_learned_facts: List[str] = []
+    user_qa_file = "data/user_learned_qa.jsonl"
+    if os.path.exists(user_qa_file):
+        try:
+            with open(user_qa_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        d = json.loads(line)
+                        if "answer" in d:
+                            session_learned_facts.append(d["answer"])
+        except Exception:
+            pass
+
     while True:
         try:
             user_input = input("\nYou > ").strip()
@@ -221,6 +236,16 @@ def main():
                     continue
                 # Micro-training adaptif dengan augmentasi variasi otomatis (analog dengan rotasi/flip)
                 variants = nl.augment_text(learn_text, max_variations=3)
+
+                # Cross-fact compositional reasoning: mensintesis relasi jika ada fakta terkait sebelumnya
+                syn_facts = nl.CompositionalReasoner.synthesize_cross_facts(learn_text, session_learned_facts)
+                if syn_facts:
+                    print(f"[Reasoning]: Mendeteksi relasi dengan fakta sebelumnya, mensintesis penalaran komposisional:")
+                    for sf in syn_facts:
+                        print(f"             • \"{sf}\"")
+                        variants.extend(nl.augment_text(sf, max_variations=2))
+                session_learned_facts.append(learn_text)
+
                 fast_opt = nl.NestedOptimizer(model.tier_param_groups(), lr=5e-3, optimizer_cls=nl.AdamW)
                 final_loss = 0.0
                 steps_taken = 0
@@ -350,6 +375,63 @@ def main():
         is_question = "?" in user_input or any(user_input.lower().startswith(q) for q in [
             "siap", "siapa", "apa", "dimana", "di mana", "kapan", "mengapa", "kenapa", "bagaimana", "apakah", "berapa"
         ])
+
+        # 1.5. Cek apakah input membutuhkan Penalaran Aritmatika / Komposisional (Multi-Hop Deduction)
+        if nl.CompositionalReasoner.is_reasoning_query(user_input):
+            def _subquery(q_text: str) -> str:
+                sub_prompt = f"Pertanyaan: {q_text.strip()}\nJawaban: "
+                sub_toks = tok.encode(sub_prompt)
+                sub_arr = np.asarray(sub_toks, dtype=np.int64)[np.newaxis, :]
+                l_sub, s_sub = model.forward(sub_arr, state=state, last_only=True)
+                l_curr = l_sub[0, -1, :].copy()
+                sub_gen = []
+                for _ in range(40):
+                    nxt = int(np.argmax(l_curr))
+                    sub_gen.append(nxt)
+                    if nxt == tok.eos_token_id or nxt == 10:
+                        break
+                    ch = tok.decode([nxt])
+                    if len(sub_gen) >= 5 and ch in (".", "!", "?"):
+                        break
+                    x_n = np.array([[nxt]], dtype=np.int64)
+                    l_s, s_sub = model.step(x_n, s_sub)
+                    l_curr = l_s[0, -1, :].copy()
+                return tok.decode(sub_gen).strip()
+
+            comp_result = nl.CompositionalReasoner.answer_composite(user_input, _subquery)
+            if comp_result is not None:
+                print(f"HOPE > [Penalaran Komposisional Step-by-Step]:")
+                for line in comp_result["cot_explanation"].split("\n"):
+                    print(f"       {line}")
+                print(f"       => Kesimpulan: {comp_result['concise_answer']}")
+
+                # Konsolidasi neural otomatis: latih relasi gabungan ke memori secara instan
+                syn_fact = comp_result["synthesized_fact"]
+                v_toks = tok.encode(syn_fact)
+                if len(v_toks) >= 4:
+                    inp_v = np.array([v_toks[:-1]], dtype=np.int64)
+                    tgt_v = np.array([v_toks[1:]], dtype=np.int64)
+                    fast_opt = nl.NestedOptimizer(model.tier_param_groups(), lr=5e-3, optimizer_cls=nl.AdamW)
+                    for _ in range(12):
+                        fast_opt.zero_grad()
+                        l_v, state = model.forward(inp_v, state=state)
+                        loss_c = loss_fn.forward(l_v, tgt_v)
+                        model.backward(loss_fn.backward())
+                        fast_opt.step()
+                        if float(loss_c) < 0.12:
+                            break
+
+                if state is not None:
+                    db_store.save_memory(
+                        session_id=current_session,
+                        state=state,
+                        meta={
+                            "last_prompt": user_input[:120],
+                            "last_reply": comp_result["concise_answer"][:120],
+                            "checkpoint": current_checkpoint,
+                        },
+                    )
+                continue
 
         if is_question:
             prompt_str = f"Pertanyaan: {user_input.strip()}\nJawaban: "

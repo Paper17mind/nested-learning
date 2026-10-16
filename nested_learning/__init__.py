@@ -36,7 +36,13 @@ from nested_learning.tokenizer import (
 )
 from nested_learning.memory_store import SQLiteMemoryStore, memory_to_vector
 from nested_learning.trainer import QADataset, TextDataset, Trainer
-from nested_learning.augmentation import TextAugmenter, augment_text
+from nested_learning.augmentation import (
+    TextAugmenter,
+    augment_text,
+    generate_counting_samples,
+    generate_counting_dataset,
+)
+from nested_learning.reasoning import CompositionalReasoner, extract_number
 __all__ = [
     "Parameter",
     "Module",
@@ -67,6 +73,11 @@ __all__ = [
     "memory_to_vector",
     "TextAugmenter",
     "augment_text",
+    "generate_counting_samples",
+    "generate_counting_dataset",
+    "CompositionalReasoner",
+    "extract_number",
 ]
 
 __version__ = "0.1.0"
+

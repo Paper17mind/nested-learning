@@ -21,6 +21,8 @@ from tests.test_delta_rule import (
 )
 from tests.test_equivalence import run_equivalence_test
 from tests.test_gradients import run_all as run_gradient_tests
+from tests.test_augmentation import run_augmentation_tests
+from tests.test_reasoning import run_reasoning_tests
 
 
 def main():
@@ -31,7 +33,7 @@ def main():
 
     t0 = time.time()
     passed = 0
-    total = 6
+    total = 8
 
     # 1. State-Passing Equivalence
     try:
@@ -74,6 +76,20 @@ def main():
         passed += 1
     except Exception as e:
         print(f"FAILED: Numerical Gradients ({e})")
+
+    # 7. Text Augmentation & Counting
+    try:
+        run_augmentation_tests()
+        passed += 1
+    except Exception as e:
+        print(f"FAILED: Text Augmentation & Counting ({e})")
+
+    # 8. Compositional Reasoning & Multi-Hop Deduction
+    try:
+        run_reasoning_tests()
+        passed += 1
+    except Exception as e:
+        print(f"FAILED: Compositional Reasoning ({e})")
 
     elapsed = time.time() - t0
     print("=" * 70)

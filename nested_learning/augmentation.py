@@ -11,7 +11,7 @@ Designed specifically for Indonesian language, developmental learning, and conti
 
 import random
 import re
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 # Kamus sinonim untuk augmentasi berbasis makna (Semantic Jitter)
@@ -41,9 +41,35 @@ SYNONYM_MAP: Dict[str, List[str]] = {
     "berputar": ["menggelinding", "berputar cepat", "berputar"],
     "menggelinding": ["berputar", "meluncur", "menggelinding"],
     
-    # Kata bantu / fungsional
+    # Kata bantu & fungsional
     "sangat": ["sekali", "amat", ""],
     "sekali": ["sangat", "amat", ""],
+
+    # Kuantitas, Angka & Berhitung
+    "1": ["satu", "1"],
+    "2": ["dua", "2"],
+    "3": ["tiga", "3"],
+    "4": ["empat", "4"],
+    "5": ["lima", "5"],
+    "6": ["enam", "6"],
+    "7": ["tujuh", "7"],
+    "8": ["delapan", "8"],
+    "9": ["sembilan", "9"],
+    "10": ["sepuluh", "10"],
+    "satu": ["1", "satu"],
+    "dua": ["2", "dua"],
+    "tiga": ["3", "tiga"],
+    "empat": ["4", "empat"],
+    "lima": ["5", "lima"],
+    "enam": ["6", "enam"],
+    "tujuh": ["7", "tujuh"],
+    "delapan": ["8", "delapan"],
+    "sembilan": ["9", "sembilan"],
+    "sepuluh": ["10", "sepuluh"],
+    "jumlah": ["total", "banyaknya", "jumlah"],
+    "total": ["jumlah", "seluruhnya", "total"],
+    "banyaknya": ["jumlah", "total", "banyaknya"],
+    "semuanya": ["totalnya", "jumlahnya", "semuanya"],
 }
 
 # Pola kalimat terstruktur anak / pengetahuan dasar
@@ -96,6 +122,19 @@ STRUCTURAL_PATTERNS: List[Tuple[re.Pattern, List[str]]] = [
             "{0} {1} {2}.",
             "{0} itu {1} {2}.",
             "{0} memiliki sifat {1} {2}.",
+        ]
+    ),
+    # Pola: "[Objek A] [Jumlah A] dan [Objek B] [Jumlah B] totalnya/jumlahnya [Jumlah Total]."
+    (
+        re.compile(
+            r"^([A-Za-z0-9\s]+?)\s+(\d+|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+(?:jari|buah|biji|butir|ekor)?\s*dan\s+([A-Za-z0-9\s]+?)\s+(\d+|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+(?:jari|buah|biji|butir|ekor)?\s*(?:totalnya|jumlahnya|semuanya|maka totalnya)\s+(?:ada\s+)?(\d+|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s*(?:jari|buah|biji|butir|ekor)?\.?$",
+            re.IGNORECASE,
+        ),
+        [
+            "Jumlah {0} {1} dan {2} {3} adalah {4}.",
+            "{0} ada {1} dan {2} ada {3}, total keseluruhannya adalah {4}.",
+            "Jika {0} berjumlah {1} serta {2} berjumlah {3}, semuanya berjumlah {4}.",
+            "Gabungan {0} {1} dengan {2} {3} menghasilkan {4}.",
         ]
     ),
 ]
@@ -202,3 +241,99 @@ _default_augmenter = TextAugmenter()
 def augment_text(text: str, max_variations: int = 4) -> List[str]:
     """Convenience helper to augment a text into multiple semantic variations."""
     return _default_augmenter.augment(text, n_variations=max_variations)
+
+
+NUMBER_WORDS: Dict[int, str] = {
+    0: "nol", 1: "satu", 2: "dua", 3: "tiga", 4: "empat",
+    5: "lima", 6: "enam", 7: "tujuh", 8: "delapan", 9: "sembilan", 10: "sepuluh",
+}
+
+
+def generate_counting_samples(
+    item_type: str = "jari tangan",
+    part_a: str = "kanan",
+    part_b: str = "kiri",
+    num_a: int = 5,
+    num_b: int = 5,
+    unit: str = "jari",
+) -> List[Dict[str, Any]]:
+    """Generate structured arithmetic & counting QA pairs and facts with diverse phrasing.
+
+    Example:
+        generate_counting_samples("jari tangan", "kanan", "kiri", 5, 5, "jari")
+        -> Returns diverse QA pairs like:
+           - "Berapa jumlah jari tangan kanan dan kiri jika kanan ada 5 dan kiri ada 5?"
+             "Jumlah jari tangan kanan 5 dan kiri 5 sehingga totalnya adalah 10 jari."
+    """
+    total = num_a + num_b
+    word_a = NUMBER_WORDS.get(num_a, str(num_a))
+    word_b = NUMBER_WORDS.get(num_b, str(num_b))
+    word_total = NUMBER_WORDS.get(total, str(total))
+
+    samples: List[Dict[str, Any]] = [
+        {
+            "question": f"Berapa jumlah {item_type} {part_a} dan {part_b} jika {part_a} ada {num_a} dan {part_b} ada {num_b}?",
+            "answer": f"Jumlah {item_type} {part_a} {num_a} dan {part_b} {num_b} adalah {total} {unit}.",
+            "prompt": f"Jumlah {item_type} {part_a} {num_a} dan {part_b} {num_b} adalah",
+            "keywords": [str(total), word_total, unit],
+        },
+        {
+            "question": f"Jika {item_type} {part_a} berjumlah {word_a} dan {item_type} {part_b} berjumlah {word_b}, berapa totalnya?",
+            "answer": f"Total {item_type} {part_a} dan {part_b} adalah {word_total} {unit}.",
+            "prompt": f"Total {item_type} {part_a} dan {part_b} adalah",
+            "keywords": [str(total), word_total, unit],
+        },
+        {
+            "question": f"Berapa total {item_type} {part_a} {num_a} ditambah {item_type} {part_b} {num_b}?",
+            "answer": f"{num_a} ditambah {num_b} hasilnya adalah {total} {unit}.",
+            "prompt": f"{num_a} ditambah {num_b} hasilnya adalah",
+            "keywords": [str(total), word_total],
+        },
+        {
+            "question": f"Ada {num_a} {unit} di {item_type} {part_a} dan {num_b} {unit} di {item_type} {part_b}. Berapa semuanya?",
+            "answer": f"Semuanya berjumlah {total} {unit}.",
+            "prompt": f"Semuanya berjumlah",
+            "keywords": [str(total), word_total, unit],
+        },
+        (
+            {
+                "question": "Berapa jumlah jari tangan kiri dan kanan?",
+                "answer": "Jari tangan kanan 5 dan jari tangan kiri 5, totalnya 10 jari.",
+                "prompt": "Jari tangan kanan 5 dan jari tangan kiri 5, totalnya",
+                "keywords": ["10", "sepuluh", "jari"],
+            }
+            if item_type == "jari tangan" and num_a == 5 and num_b == 5
+            else {
+                "question": f"Berapa hasil {num_a} ditambah {num_b}?",
+                "answer": f"Hasil {num_a} ditambah {num_b} adalah {total}.",
+                "prompt": f"Hasil {num_a} ditambah {num_b} adalah",
+                "keywords": [str(total), word_total],
+            }
+        ),
+    ]
+    return samples
+
+
+def generate_counting_dataset(max_sum: int = 10) -> List[Dict[str, Any]]:
+    """Generate developmental arithmetic and counting QA dataset for cognitive training."""
+    items: List[Dict[str, Any]] = []
+    scenarios = [
+        ("jari tangan", "kanan", "kiri", "jari"),
+        ("buah apel", "merah", "hijau", "apel"),
+        ("balok susun", "merah", "kuning", "balok"),
+        ("bola mainan", "besar", "kecil", "bola"),
+        ("kue manis", "cokelat", "keju", "kue"),
+    ]
+    for item_type, part_a, part_b, unit in scenarios:
+        for a in range(1, 6):
+            for b in range(1, 6):
+                if a + b <= max_sum:
+                    for s in generate_counting_samples(item_type, part_a, part_b, a, b, unit):
+                        items.append({
+                            "stage": 5,
+                            "stage_name": "berhitung",
+                            "topic": f"Hitung {item_type.title()} ({a}+{b})",
+                            **s,
+                        })
+    return items
+
