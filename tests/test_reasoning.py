@@ -55,8 +55,13 @@ def run_reasoning_tests():
     assert direct_res is not None, "Failed to compute direct arithmetic"
     assert direct_res["val_a"] == 10 and direct_res["val_b"] == 5, "Operands mismatch"
     assert direct_res["total"] == 15, f"Expected 15, got {direct_res['total']}"
-    print(f"\nDirect Arithmetic Query: \"{direct_query}\"")
-    print(f"Result: {direct_res['concise_answer']}")
+    # 5. Test Arbitrary Nouns & Typos (e.g. 'jumla kelereng 5 dan 15 adalah')
+    kelereng_q = "jumla kelereng 5 dan 15 adalah"
+    kel_res = nl.CompositionalReasoner.answer_composite(kelereng_q)
+    assert kel_res is not None, "Failed to resolve kelereng query"
+    assert kel_res["total"] == 20, f"Expected 20, got {kel_res['total']}"
+    print(f"\nArbitrary Noun Query: \"{kelereng_q}\"")
+    print(f"Result: {kel_res['concise_answer']}")
 
     print("\n✓ Compositional Reasoning tests PASSED!\n")
 

@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import time
+from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".")))
 
@@ -376,8 +377,10 @@ def main():
             "siap", "siapa", "apa", "dimana", "di mana", "kapan", "mengapa", "kenapa", "bagaimana", "apakah", "berapa"
         ])
 
-        # 1.5. Cek apakah input membutuhkan Penalaran Aritmatika / Komposisional (Multi-Hop Deduction)
-        if nl.CompositionalReasoner.is_reasoning_query(user_input):
+        # 1.5. [DISABLED] Penalaran Komposisional dinonaktifkan sementara
+        #      agar perkembangan belajar model dapat diamati secara langsung.
+        #      Untuk mengaktifkan kembali, ganti `if False:` → `if nl.CompositionalReasoner.is_reasoning_query(user_input):`
+        if False and nl.CompositionalReasoner.is_reasoning_query(user_input):  # noqa: SIM210
             def _subquery(q_text: str) -> str:
                 sub_prompt = f"Pertanyaan: {q_text.strip()}\nJawaban: "
                 sub_toks = tok.encode(sub_prompt)
@@ -404,23 +407,6 @@ def main():
                 for line in comp_result["cot_explanation"].split("\n"):
                     print(f"       {line}")
                 print(f"       => Kesimpulan: {comp_result['concise_answer']}")
-
-                # Konsolidasi neural otomatis: latih relasi gabungan ke memori secara instan
-                syn_fact = comp_result["synthesized_fact"]
-                v_toks = tok.encode(syn_fact)
-                if len(v_toks) >= 4:
-                    inp_v = np.array([v_toks[:-1]], dtype=np.int64)
-                    tgt_v = np.array([v_toks[1:]], dtype=np.int64)
-                    fast_opt = nl.NestedOptimizer(model.tier_param_groups(), lr=5e-3, optimizer_cls=nl.AdamW)
-                    for _ in range(12):
-                        fast_opt.zero_grad()
-                        l_v, state = model.forward(inp_v, state=state)
-                        loss_c = loss_fn.forward(l_v, tgt_v)
-                        model.backward(loss_fn.backward())
-                        fast_opt.step()
-                        if float(loss_c) < 0.12:
-                            break
-
                 if state is not None:
                     db_store.save_memory(
                         session_id=current_session,
@@ -432,6 +418,7 @@ def main():
                         },
                     )
                 continue
+
 
         if is_question:
             prompt_str = f"Pertanyaan: {user_input.strip()}\nJawaban: "

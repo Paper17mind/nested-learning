@@ -75,8 +75,13 @@ class BaseTeacher:
         raise NotImplementedError
 
 
-CURRICULUM_BANK = {
-    "transportasi": [
+# ── Static curriculum loaded from external JSON (dapat diedit tanpa ubah kode) ──
+_CURRICULUM_BANK_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "data", "curriculum_bank.json"
+)
+
+_FALLBACK_CURRICULUM_BANK: Dict[str, Any] = {
+    "umum": [
         {
             "topic": "Transportasi Darat: Mobil",
             "lesson": "Mobil adalah alat transportasi darat beroda empat.",
@@ -84,123 +89,89 @@ CURRICULUM_BANK = {
             "expected_keywords": ["alat", "transportasi", "darat", "roda", "empat"],
         },
         {
-            "topic": "Transportasi Darat: Sepeda Motor",
-            "lesson": "Sepeda motor adalah kendaraan darat beroda dua.",
-            "quiz_prompt": "Sepeda motor adalah",
-            "expected_keywords": ["kendaraan", "darat", "roda", "dua"],
-        },
-        {
-            "topic": "Transportasi Udara: Pesawat Terbang",
-            "lesson": "Pesawat terbang adalah alat transportasi udara bersayap.",
-            "quiz_prompt": "Pesawat terbang adalah",
-            "expected_keywords": ["alat", "transportasi", "udara", "bersayap"],
-        },
-        {
-            "topic": "Transportasi Laut: Kapal Laut",
-            "lesson": "Kapal laut adalah alat transportasi di atas air.",
-            "quiz_prompt": "Kapal laut adalah",
-            "expected_keywords": ["alat", "transportasi", "air"],
-        },
-        {
-            "topic": "Transportasi Rel: Kereta Api",
-            "lesson": "Kereta api adalah kendaraan darat di atas rel.",
-            "quiz_prompt": "Kereta api adalah",
-            "expected_keywords": ["kendaraan", "darat", "rel"],
-        },
-        {
-            "topic": "Transportasi Udara: Helikopter",
-            "lesson": "Helikopter adalah pesawat udara dengan baling-baling putar.",
-            "quiz_prompt": "Helikopter adalah",
-            "expected_keywords": ["pesawat", "udara", "baling", "putar"],
-        },
-    ],
-    "teknologi": [
-        {
             "topic": "Teknologi: Komputer",
             "lesson": "Komputer adalah alat elektronik untuk mengolah data.",
             "quiz_prompt": "Komputer adalah",
             "expected_keywords": ["alat", "elektronik", "mengolah", "data"],
         },
         {
-            "topic": "Teknologi: Kecerdasan Buatan (AI)",
-            "lesson": "Kecerdasan buatan adalah teknologi komputer peniru akal manusia.",
-            "quiz_prompt": "Kecerdasan buatan adalah",
-            "expected_keywords": ["teknologi", "komputer", "akal", "manusia"],
-        },
-        {
-            "topic": "Teknologi: Robotika",
-            "lesson": "Robotika adalah bidang teknologi perancangan mesin otomatis.",
-            "quiz_prompt": "Robotika adalah",
-            "expected_keywords": ["teknologi", "mesin", "otomatis"],
-        },
-        {
-            "topic": "Teknologi: Jaringan Internet",
-            "lesson": "Internet adalah jaringan global penghubung komputer dunia.",
-            "quiz_prompt": "Internet adalah",
-            "expected_keywords": ["jaringan", "global", "komputer", "dunia"],
-        },
-    ],
-    "sains": [
-        {
             "topic": "Sains: Planet Bumi",
             "lesson": "Bumi adalah planet dalam tata surya tempat kehidupan.",
             "quiz_prompt": "Bumi adalah",
             "expected_keywords": ["planet", "tata", "surya", "kehidupan"],
         },
-        {
-            "topic": "Sains: Planet Mars",
-            "lesson": "Mars adalah planet merah terdekat dari matahari.",
-            "quiz_prompt": "Mars adalah",
-            "expected_keywords": ["planet", "merah", "matahari"],
-        },
-        {
-            "topic": "Sains: Hukum Gravitasi",
-            "lesson": "Gravitasi adalah gaya tarik mendasar antar benda bermassa.",
-            "quiz_prompt": "Gravitasi adalah",
-            "expected_keywords": ["gaya", "tarik", "benda", "massa"],
-        },
-        {
-            "topic": "Sains: Dinosaurus",
-            "lesson": "Dinosaurus adalah hewan reptil purba yang telah punah.",
-            "quiz_prompt": "Dinosaurus adalah",
-            "expected_keywords": ["hewan", "reptil", "purba", "punah"],
-        },
-    ],
-    "biologi": [
-        {
-            "topic": "Biologi: Kucing",
-            "lesson": "Kucing adalah hewan mamalia karnivora peliharaan manusia.",
-            "quiz_prompt": "Kucing adalah",
-            "expected_keywords": ["hewan", "mamalia", "peliharaan", "manusia"],
-        },
-        {
-            "topic": "Biologi: Burung Elang",
-            "lesson": "Burung elang adalah burung pemangsa berlihatan tajam.",
-            "quiz_prompt": "Burung elang adalah",
-            "expected_keywords": ["burung", "pemangsa", "tajam"],
-        },
-        {
-            "topic": "Biologi: Hutan Hujan Tropis",
-            "lesson": "Hutan hujan tropis adalah bioma hutan lebat kaya tumbuhan.",
-            "quiz_prompt": "Hutan hujan tropis adalah",
-            "expected_keywords": ["hutan", "lebat", "tumbuhan"],
-        },
-    ],
-    "kuliner": [
-        {
-            "topic": "Kuliner: Kopi Nusantara",
-            "lesson": "Kopi adalah minuman seduhan nikmat dari biji sangrai.",
-            "quiz_prompt": "Kopi adalah",
-            "expected_keywords": ["minuman", "seduhan", "biji", "sangrai"],
-        },
-        {
-            "topic": "Kuliner: Nasi Goreng",
-            "lesson": "Nasi goreng adalah hidangan nasi berbumbu khas rempah.",
-            "quiz_prompt": "Nasi goreng adalah",
-            "expected_keywords": ["hidangan", "nasi", "bumbu", "rempah"],
-        },
-    ],
+    ]
 }
+
+
+def _load_curriculum_bank() -> Dict[str, Any]:
+    """Load curriculum bank dari data/curriculum_bank.json; fallback ke dict bawaan jika tidak ada."""
+    path = os.path.abspath(_CURRICULUM_BANK_PATH)
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[Warning] Gagal membaca {path}: {e}. Menggunakan fallback.")
+    return _FALLBACK_CURRICULUM_BANK
+
+
+CURRICULUM_BANK: Dict[str, Any] = _load_curriculum_bank()
+
+
+def _load_math_curriculum(age: Optional[int] = None) -> List[Dict[str, Any]]:
+    """Load dataset matematika dari data/math_curriculum/ berdasarkan usia (1-4) atau gabungan.
+
+    Setiap item akan dikonversi ke format lesson/quiz yang dipahami CurriculumTeacher.
+    Format math item: {stage, age, topic, question, prompt, answer, keywords}
+    """
+    base_dir = os.path.join(os.path.dirname(__file__), "..", "data", "math_curriculum")
+    base_dir = os.path.abspath(base_dir)
+
+    age_files = {
+        1: "age_1_numbers.jsonl",
+        2: "age_2_numbers.jsonl",
+        3: "age_3_addition_subtraction.jsonl",
+        4: "age_4_operations.jsonl",
+    }
+
+    items: List[Dict[str, Any]] = []
+
+    if age is not None:
+        filenames = [age_files[age]] if age in age_files else []
+    else:
+        # Coba all_ages.jsonl dulu (pre-generated gabungan)
+        all_path = os.path.join(base_dir, "all_ages.jsonl")
+        if os.path.exists(all_path):
+            filenames = ["all_ages.jsonl"]
+        else:
+            filenames = list(age_files.values())
+
+    for fname in filenames:
+        fpath = os.path.join(base_dir, fname)
+        if not os.path.exists(fpath):
+            continue
+        with open(fpath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                # Konversi ke format CurriculumTeacher
+                items.append({
+                    "topic": obj.get("topic", ""),
+                    "lesson": obj.get("answer", ""),
+                    "quiz_question": obj.get("question", ""),
+                    "quiz_prompt": obj.get("prompt", ""),
+                    "expected_keywords": obj.get("keywords", []),
+                    # Meta tambahan untuk filtering per stage
+                    "stage_name": obj.get("stage", "anak"),
+                    "age": obj.get("age", 4),
+                })
+    return items
+
+
+CURRICULUM_BANK = _load_curriculum_bank()
 
 
 def build_teacher_prompt(stage: str, turn_idx: int, topic_hint: Optional[str], seen_topics: List[str]) -> Tuple[str, str]:
@@ -271,19 +242,44 @@ HANYA JSON murni tanpa penjelasan markdown."""
 
 
 class CurriculumTeacher(BaseTeacher):
-    """Built-in structured Indonesian curriculum teacher with diverse category banks."""
+    """Built-in structured Indonesian curriculum teacher.
 
-    def __init__(self, category: str = "all", custom_file: Optional[str] = None, stage: str = "none"):
+    Mendukung tiga sumber kurikulum:
+      1. Developmental QA (data/developmental_qa.jsonl) - bayi/batita/balita/anak
+      2. Math Curriculum  (data/math_curriculum/)        - angka, hitung, operasi
+      3. General Curriculum (data/curriculum_bank.json)  - transportasi, sains, dll
+    """
+
+    def __init__(
+        self,
+        category: str = "all",
+        custom_file: Optional[str] = None,
+        stage: str = "none",
+        math_age: Optional[int] = None,   # None = semua usia; 1-4 = usia spesifik
+        use_math: bool = False,            # True = gunakan math curriculum
+    ):
         self.stage = stage
-        self.seen_topics = set()
-        self.dev_items = []
-        if stage in ("bayi", "batita", "balita", "anak", "grow") and os.path.exists("data/developmental_qa.jsonl"):
-            with open("data/developmental_qa.jsonl", "r", encoding="utf-8") as f:
+        self.seen_topics: set = set()
+        self.dev_items: List[Dict[str, Any]] = []
+        self.math_items: List[Dict[str, Any]] = []
+
+        # 1. Load Developmental QA (untuk stage bayi/batita/balita/anak/grow)
+        dev_path = os.path.join(os.path.dirname(__file__), "..", "data", "developmental_qa.jsonl")
+        dev_path = os.path.abspath(dev_path)
+        if stage in ("bayi", "batita", "balita", "anak", "grow") and os.path.exists(dev_path):
+            with open(dev_path, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         self.dev_items.append(json.loads(line))
-        self.curriculum: List[Dict[str, Any]] = []
 
+        # 2. Load Math Curriculum (opsional via --materi-math)
+        if use_math:
+            self.math_items = _load_math_curriculum(age=math_age)
+            print(f"[Math Curriculum] Dimuat {len(self.math_items)} soal matematik"
+                  f" (usia={math_age or 'semua'}).")
+
+        # 3. Load General Curriculum
+        self.curriculum: List[Dict[str, Any]] = []
         if custom_file and os.path.exists(custom_file):
             self.curriculum = self._load_custom_file(custom_file)
         elif category == "all":
@@ -294,6 +290,10 @@ class CurriculumTeacher(BaseTeacher):
         else:
             for items in CURRICULUM_BANK.values():
                 self.curriculum.extend(items)
+
+        # Gabungkan math_items ke curriculum jika ada
+        if self.math_items:
+            self.curriculum = self.math_items + self.curriculum
 
     def _load_custom_file(self, filepath: str) -> List[Dict[str, Any]]:
         items = []
@@ -350,6 +350,32 @@ class CurriculumTeacher(BaseTeacher):
                 "quiz_question": f"Apa yang dimaksud dengan {topic_hint}?",
                 "quiz_prompt": f"{topic_hint} adalah",
                 "expected_keywords": [w.lower() for w in words] + ["konsep", "penting", "peran"],
+            }
+
+        if self.math_items:
+            if self.stage != "none":
+                stage_map = {1: "bayi", 2: "batita", 3: "balita", 4: "anak"}
+                curr_stage = stage_map.get(min(4, turn_idx), "anak") if self.stage == "grow" else self.stage
+                math_pool = [it for it in self.math_items if it.get("stage_name") == curr_stage]
+                if not math_pool:
+                    math_pool = self.math_items
+            else:
+                math_pool = self.math_items
+
+            unseen = [it for it in math_pool if it["topic"].lower() not in self.seen_topics]
+            if not unseen:
+                self.seen_topics.clear()
+                unseen = math_pool
+
+            it = random.choice(unseen)
+            self.seen_topics.add(it["topic"].lower())
+
+            return {
+                "topic": it["topic"],
+                "lesson": it.get("lesson", it.get("answer", "")),
+                "quiz_question": it.get("quiz_question", it.get("question", "")),
+                "quiz_prompt": it.get("quiz_prompt", it.get("prompt", "")),
+                "expected_keywords": it.get("expected_keywords", it.get("keywords", [])),
             }
 
         if self.stage != "none" and self.dev_items:
@@ -495,7 +521,7 @@ def parse_args():
     parser.add_argument("--topic", type=str, default=None,
                         help="Specific topic/theme for the teacher (e.g. --topic 'Dinosaurus' or --topic 'Robotika')")
     parser.add_argument("--topics", type=str, default=None,
-                        help="Comma-separated topics for consecutive turns (e.g. --topics 'Mobil Listrik,Robotika,Planet Mars,Kucing,Kopi')")
+                        help="Comma-separated topics for consecutive turns")
     parser.add_argument("--stage", type=str, default="none",
                         choices=["none", "bayi", "batita", "balita", "anak", "grow"],
                         help="Tahap perkembangan kognitif: 'bayi', 'batita', 'balita', 'anak', atau 'grow' (tumbuh bertahap)")
@@ -510,28 +536,37 @@ def parse_args():
     parser.add_argument("--no-augment", dest="augment", action="store_false",
                         help="Nonaktifkan augmentasi teks otomatis saat tidur")
     parser.add_argument("--category", type=str, default="all",
-                        choices=["all", "transportasi", "teknologi", "sains", "biologi", "kuliner"],
-                        help="Pre-defined category pack for offline curriculum teacher (default: 'all')")
+                        help="Kategori kurikulum dari data/curriculum_bank.json (default: 'all'). "
+                             "Nilai yang tersedia: all, transportasi, teknologi, sains, biologi, kuliner")
     parser.add_argument("--materi-file", type=str, default=None,
-                        help="Path to custom text (.txt paragraphs) or JSONL file containing custom lessons")
-    parser.add_argument("--checkpoint", type=str, default="models/hope_id.npz",
-                        help="Base model checkpoint to teach (defaults to models/hope_id.npz if exists)")
+                        help="Path ke file .txt atau .jsonl berisi materi kustom")
+
+    # ── Math Curriculum ────────────────────────────────────────────────────────
+    parser.add_argument("--materi-math", action="store_true", default=False,
+                        help="Gunakan dataset matematika dari data/math_curriculum/ "
+                             "(angka, hitung, penjumlahan, pengurangan, perkalian, dll)")
+    parser.add_argument("--math-age", type=int, default=None, choices=[1, 2, 3, 4],
+                        help="Filter usia matematika: 1=bayi(1-5), 2=batita(6-10), "
+                             "3=balita(+/-), 4=anak(x/:). Default: semua usia")
+
+    parser.add_argument("--checkpoint", type=str, default="models/hope_infant.npz",
+                        help="Base model checkpoint to teach")
     parser.add_argument("--resume", action="store_true", default=False,
-                        help="Lanjutkan belajar dari checkpoint tutored sebelumnya (models/hope_tutored.npz)")
+                        help="Lanjutkan belajar dari checkpoint tutored sebelumnya")
     parser.add_argument("--save-path", type=str, default="models/hope_tutored.npz",
                         help="Path to save the model after tutoring")
-    parser.add_argument("--lr", type=float, default=1.2e-3, help="Learning rate per turn (gentle for stability)")
-    parser.add_argument("--learn-steps", type=int, default=14, help="Number of optimization steps per lesson turn")
-    parser.add_argument("--max-quiz-tokens", type=int, default=65, help="Max tokens generated during quiz response")
+    parser.add_argument("--lr", type=float, default=1.2e-3, help="Learning rate per turn")
+    parser.add_argument("--learn-steps", type=int, default=14, help="Optimization steps per lesson turn")
+    parser.add_argument("--max-quiz-tokens", type=int, default=65, help="Max tokens during quiz")
     parser.add_argument("--temperature", type=float, default=0.15, help="Sampling temperature during quiz")
 
     # API options (defaults from .env)
     parser.add_argument("--api-key", type=str, default=os.getenv("OPENAI_API_KEY", ""),
                         help="API key for teacher (defaults to OPENAI_API_KEY in .env)")
     parser.add_argument("--base-url", type=str, default=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
-                        help="Base URL for API (defaults to OPENAI_BASE_URL in .env, e.g. OpenRouter/9router)")
+                        help="Base URL for API")
     parser.add_argument("--model", type=str, default=os.getenv("LLM_MODEL", "meta-llama/llama-3-8b-instruct:free"),
-                        help="Model name for teacher (defaults to LLM_MODEL in .env)")
+                        help="Model name for teacher")
     return parser.parse_args()
 
 def clean_sentence_output(text: str) -> str:
@@ -719,7 +754,13 @@ def main():
     if teacher_type == "curriculum":
         if args.stage != "none":
             teacher_desc = f"Kurikulum Tumbuh Kembang Kognitif (Tahap: {args.stage.upper()})"
-        teacher = CurriculumTeacher(category=args.category, custom_file=args.materi_file, stage=args.stage)
+        teacher = CurriculumTeacher(
+                category=args.category,
+                custom_file=args.materi_file,
+                stage=args.stage,
+                use_math=getattr(args, "materi_math", False),
+                math_age=getattr(args, "math_age", None),
+            )
         print(f"Guru (Teacher): {teacher_desc}")
     elif teacher_type == "ollama":
         teacher = OllamaTeacher(model=args.model, stage=args.stage)
